@@ -1,0 +1,31 @@
+mgh009 8 360/0.476 1800215
+mgh009.dat 212 1290(-66)/mV 12 0 -678 12928 0 ECG lead I
+mgh009.dat 212 1301(-568)/mV 12 0 -967 25189 0 ECG lead II
+mgh009.dat 212 1188(-277)/mV 12 0 -850 43515 0 ECG lead V
+mgh009.dat 212 11.94(-1217)/mmHg 12 0 -1415 18897 0 ART
+mgh009.dat 212 20.44(-1006)/mmHg 12 0 -1148 30564 0 PAP
+mgh009.dat 212 20.98(-1019)/mmHg 12 0 -1267 48190 0 CVP
+mgh009.dat 212 1000 12 0 -598 22404 0 Resp. Imp.
+mgh009.dat 212 1000 12 0 -424 8364 0 CO2
+#<age>: 56 <sex>: M <diagnoses>: Resection and grafting of thoraco-abdominal aneurysm
+# ELECTROCARDIOGRAPHIC DATA:
+# UNDERLYING RHYTHM:
+#   Sinus tachycardia @ 105 bpm
+# ECG INTERPRETATION:
+#   Left axis deviation
+#   Minor nonspecific ST segment and T wave abnormalities
+# TECHNICAL COMMENTS:
+#   6O-cycle interference in Lead I
+#   Movement artifact in V lead
+# HEMODYNAMIC DATA:
+#   ART: 150/80   	MEAN: 103
+#   PAP: 26/16   	PCW: 12 (@ 12 min, 27 min, 59 min)
+#   RAP: 12
+# WAVEFORM PATTERNS:
+#   Respiratory variation
+# TECHNICAL COMMENTS:
+#   CVP re-zeroed @ 11 min
+# RESPIRATORY DATA:
+# RATE:   6/20 bpm
+# MODE OF VENTILATION:
+#   Intermittent mandatory ventilation

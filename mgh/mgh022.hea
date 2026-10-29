@@ -1,0 +1,38 @@
+mgh022 8 360/0.476 1740116
+mgh022.dat 212 729(38)/mV 12 0 -701 32517 0 ECG lead I
+mgh022.dat 212 767(-221)/mV 12 0 -854 61738 0 ECG lead II
+mgh022.dat 212 731(47)/mV 12 0 -591 9928 0 ECG lead V
+mgh022.dat 212 12.11(-1219)/mmHg 12 0 -360 21969 0 ART
+mgh022.dat 212 20.64(-1021)/mmHg 12 0 -794 44800 0 PAP
+mgh022.dat 212 20.48(-1028)/mmHg 12 0 -1296 57327 0 CVP
+mgh022.dat 212 1000 12 0 -641 38739 0 Resp. Imp.
+mgh022.dat 212 1000 12 0 -1379 61398 0 CO2
+#<age>: 74 <sex>: M <diagnoses>: Upper GI bleed
+# PERTINENT HISTORY:
+#   Coronary disease
+#   Peripheral vascular disease
+# GENERAL COMMENTS:
+#   Stop/FFW @ 62 min - 63 min
+# ELECTROCARDIOGRAPHIC DATA:
+# UNDERLYING RHYTHM:
+#   Normal sinus rhythm @ 85 bpm
+# RHYTHM DISTURBANCES:
+#   Atrial ectopy, occasional blocked conduction
+#   Multifocal ventricular ectopy with ventricular bigeminy, couplets and idioventricular rhythm (@ 0-13 min)
+# ECG INTERPRETATION:
+#   Acute anterior subendocardial injury, question evolving infarction
+# HEMODYNAMIC DATA:
+#   ART: 120/70   	MEAN: 93
+#   (femoral)
+#   PAP: 36/20   	PCW: 16 (@ 35 min, 49 min, 65 min)
+#   RAP: 8   	CO:   5.3
+# WAVEFORM PATTERNS:
+#   "Catheter whip"
+#   Respiratory variation
+#   Arrhythmias produce A-V asynchrony in the right atrial pressure trace
+# RESPIRATORY DATA:
+# RATE:   16 bpm
+# MODE OF VENTILATION:
+#   Spontaneous
+# CO2 RECORDING:
+#   An impedance signal on @ 51 min

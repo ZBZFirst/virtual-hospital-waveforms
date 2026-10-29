@@ -1,0 +1,312 @@
+{
+  "scene": "zebezo_unit_19_six_floor_full_telemetry_v22.blend",
+  "source": "https://physionet.org/content/mghdb/1.0.0/",
+  "license": "Open Data Commons Attribution License v1.0",
+  "attribution": "MGH/MF Waveform Database, PhysioNet; see source page",
+  "matching_note": "Independent recorded teaching sources; not matched to virtual patient or ventilator. Floors 5-6 reuse floors 3-4 teaching recordings.",
+  "playback": "Native 360 Hz source samples, eight-second display window with peak-preserving screen reduction; modulo each record's exact sample count loops to first sample after last sample. Elapsed time persists across Blender timeline restarts; raw files are unchanged.",
+  "floor_height_m": 3.2,
+  "timeline_end_frame": 125278,
+  "rooms": [
+    {
+      "floor": 1,
+      "room": 1,
+      "record": "mgh001",
+      "samples": 1376831,
+      "duration_s": 3824.5305555555556,
+      "file_sha256": "07059d20fc4042eb861e067dd0aadc71f174adc7c832600ed149b702eca2629e"
+    },
+    {
+      "floor": 1,
+      "room": 2,
+      "record": "mgh002",
+      "samples": 1815464,
+      "duration_s": 5042.955555555555,
+      "file_sha256": "0c6b55f1d730d1009ce790773e0ba17fde262f4084c8018ca012d1f4bf6e9995"
+    },
+    {
+      "floor": 1,
+      "room": 3,
+      "record": "mgh003",
+      "samples": 1166933,
+      "duration_s": 3241.4805555555554,
+      "file_sha256": "b582f0ea917d85e20b5eec806f841fddbf243eb29bcec8adc8a8927234fb4031"
+    },
+    {
+      "floor": 1,
+      "room": 4,
+      "record": "mgh004",
+      "samples": 1029692,
+      "duration_s": 2860.2555555555555,
+      "file_sha256": "563ac5c71ed7434d3aac37684903f66e38d31e8cc784bcb9abcad8370cc1cf1a"
+    },
+    {
+      "floor": 1,
+      "room": 5,
+      "record": "mgh005",
+      "samples": 1706927,
+      "duration_s": 4741.4638888888885,
+      "file_sha256": "01f6a424ee32328d7c38b87eff9f0c8a0506ea9809806f94fef572a40133443e"
+    },
+    {
+      "floor": 1,
+      "room": 6,
+      "record": "mgh006",
+      "samples": 1626197,
+      "duration_s": 4517.2138888888885,
+      "file_sha256": "5a985936fafe9e8bdf5a07cd53483f013abd191ecfd0415be4d9fdabaa26d830"
+    },
+    {
+      "floor": 2,
+      "room": 1,
+      "record": "mgh007",
+      "samples": 1267397,
+      "duration_s": 3520.5472222222224,
+      "file_sha256": "0ec55ad19fef76cb9a7174963dbb2e84590024649eb33b73eb5ec26930338172"
+    },
+    {
+      "floor": 2,
+      "room": 2,
+      "record": "mgh008",
+      "samples": 1323908,
+      "duration_s": 3677.5222222222224,
+      "file_sha256": "c64dbc491f37e1d0a6b77c63799e01cd94aa8376d2ad381f58a05fc8a0b13068"
+    },
+    {
+      "floor": 2,
+      "room": 3,
+      "record": "mgh009",
+      "samples": 1800215,
+      "duration_s": 5000.597222222223,
+      "file_sha256": "188e225bdd3d494b0051581ea8a87d42255b6122d3d92fe5f8aad651e5dc524f"
+    },
+    {
+      "floor": 2,
+      "room": 4,
+      "record": "mgh010",
+      "samples": 1872872,
+      "duration_s": 5202.422222222222,
+      "file_sha256": "212a91c85b3f8671fc70a4a483545afc62748d5ca8516d62d5f2ef63c791d6a6"
+    },
+    {
+      "floor": 2,
+      "room": 5,
+      "record": "mgh011",
+      "samples": 1879151,
+      "duration_s": 5219.863888888889,
+      "file_sha256": "304b05a017f6e88aaa32e5cd69c9ce61031338d66779ca9363f1c5bb9ab114c4"
+    },
+    {
+      "floor": 2,
+      "room": 6,
+      "record": "mgh013",
+      "samples": 1872720,
+      "duration_s": 5202.0,
+      "file_sha256": "e9e0ca0595c71a7005c8ab4bbdf3f5139d79779dedab63a62d37d1be528e4ee9"
+    },
+    {
+      "floor": 3,
+      "room": 1,
+      "record": "mgh015",
+      "samples": 1740097,
+      "duration_s": 4833.602777777778,
+      "file_sha256": "a8fa6a300c70afecf0bcd2902b4300531d8306e485e9abd3bd907376d9e9b2f6"
+    },
+    {
+      "floor": 3,
+      "room": 2,
+      "record": "mgh016",
+      "samples": 1452179,
+      "duration_s": 4033.8305555555557,
+      "file_sha256": "c72046123b364185f740b46a233b7271bf02dbee2266fb75fc042623e3e0b95f"
+    },
+    {
+      "floor": 3,
+      "room": 3,
+      "record": "mgh019",
+      "samples": 1483920,
+      "duration_s": 4122.0,
+      "file_sha256": "eab00a5353f59ab7a6b1c1cf22585cab29279cb5bbce8a8608e95224ce4b3a33"
+    },
+    {
+      "floor": 3,
+      "room": 4,
+      "record": "mgh020",
+      "samples": 1663871,
+      "duration_s": 4621.863888888889,
+      "file_sha256": "4096b66d078cc171171a914b822f9944e3a0cd01269eb868ea39d6da7b75e510"
+    },
+    {
+      "floor": 3,
+      "room": 5,
+      "record": "mgh021",
+      "samples": 1166400,
+      "duration_s": 3240.0,
+      "file_sha256": "042ea478517d9f70325a13c85c178febc78f09ad727052439d22062c443e5ca2"
+    },
+    {
+      "floor": 3,
+      "room": 6,
+      "record": "mgh022",
+      "samples": 1740116,
+      "duration_s": 4833.655555555555,
+      "file_sha256": "d5e2a43b43ce172aaf1403d279f69ae9df5d29fcded0576bbfa708fa1962722f"
+    },
+    {
+      "floor": 4,
+      "room": 1,
+      "record": "mgh023",
+      "samples": 1777790,
+      "duration_s": 4938.305555555556,
+      "file_sha256": "81dcdb00286c454aeaabf98aaad486a81b549caf3de88eb776a419547db548ab"
+    },
+    {
+      "floor": 4,
+      "room": 2,
+      "record": "mgh026",
+      "samples": 1728000,
+      "duration_s": 4800.0,
+      "file_sha256": "93c9ffd1d1460c5def6ea6bd5203c4aa6e7f5697036aa96c163109873e12b2eb"
+    },
+    {
+      "floor": 4,
+      "room": 3,
+      "record": "mgh027",
+      "samples": 1401947,
+      "duration_s": 3894.2972222222224,
+      "file_sha256": "12d11f5887a52fb9ed703aaf575883d8b6ee4c028ba995d2053aed9e9213f892"
+    },
+    {
+      "floor": 4,
+      "room": 4,
+      "record": "mgh028",
+      "samples": 1571480,
+      "duration_s": 4365.222222222223,
+      "file_sha256": "35b087b05c40723a78399b44c980f4193de380d3c674f25023bf45bc4962c572"
+    },
+    {
+      "floor": 4,
+      "room": 5,
+      "record": "mgh029",
+      "samples": 1751777,
+      "duration_s": 4866.047222222222,
+      "file_sha256": "3cce2852552b50f6007051bb46275c7eb1f129b79ea9e186ad43dd9e7deadcc5"
+    },
+    {
+      "floor": 4,
+      "room": 6,
+      "record": "mgh030",
+      "samples": 1815464,
+      "duration_s": 5042.955555555555,
+      "file_sha256": "ef4b3148d0938672b30b2555c0141ab0d1df65f1dd55ff86ab7e484b21192ea4"
+    },
+    {
+      "floor": 5,
+      "room": 1,
+      "record": "mgh015",
+      "samples": 1740097,
+      "duration_s": 4833.602777777778,
+      "file_sha256": "a8fa6a300c70afecf0bcd2902b4300531d8306e485e9abd3bd907376d9e9b2f6",
+      "reused_from_floor": 3
+    },
+    {
+      "floor": 5,
+      "room": 2,
+      "record": "mgh016",
+      "samples": 1452179,
+      "duration_s": 4033.8305555555557,
+      "file_sha256": "c72046123b364185f740b46a233b7271bf02dbee2266fb75fc042623e3e0b95f",
+      "reused_from_floor": 3
+    },
+    {
+      "floor": 5,
+      "room": 3,
+      "record": "mgh019",
+      "samples": 1483920,
+      "duration_s": 4122.0,
+      "file_sha256": "eab00a5353f59ab7a6b1c1cf22585cab29279cb5bbce8a8608e95224ce4b3a33",
+      "reused_from_floor": 3
+    },
+    {
+      "floor": 5,
+      "room": 4,
+      "record": "mgh020",
+      "samples": 1663871,
+      "duration_s": 4621.863888888889,
+      "file_sha256": "4096b66d078cc171171a914b822f9944e3a0cd01269eb868ea39d6da7b75e510",
+      "reused_from_floor": 3
+    },
+    {
+      "floor": 5,
+      "room": 5,
+      "record": "mgh021",
+      "samples": 1166400,
+      "duration_s": 3240.0,
+      "file_sha256": "042ea478517d9f70325a13c85c178febc78f09ad727052439d22062c443e5ca2",
+      "reused_from_floor": 3
+    },
+    {
+      "floor": 5,
+      "room": 6,
+      "record": "mgh022",
+      "samples": 1740116,
+      "duration_s": 4833.655555555555,
+      "file_sha256": "d5e2a43b43ce172aaf1403d279f69ae9df5d29fcded0576bbfa708fa1962722f",
+      "reused_from_floor": 3
+    },
+    {
+      "floor": 6,
+      "room": 1,
+      "record": "mgh023",
+      "samples": 1777790,
+      "duration_s": 4938.305555555556,
+      "file_sha256": "81dcdb00286c454aeaabf98aaad486a81b549caf3de88eb776a419547db548ab",
+      "reused_from_floor": 4
+    },
+    {
+      "floor": 6,
+      "room": 2,
+      "record": "mgh026",
+      "samples": 1728000,
+      "duration_s": 4800.0,
+      "file_sha256": "93c9ffd1d1460c5def6ea6bd5203c4aa6e7f5697036aa96c163109873e12b2eb",
+      "reused_from_floor": 4
+    },
+    {
+      "floor": 6,
+      "room": 3,
+      "record": "mgh027",
+      "samples": 1401947,
+      "duration_s": 3894.2972222222224,
+      "file_sha256": "12d11f5887a52fb9ed703aaf575883d8b6ee4c028ba995d2053aed9e9213f892",
+      "reused_from_floor": 4
+    },
+    {
+      "floor": 6,
+      "room": 4,
+      "record": "mgh028",
+      "samples": 1571480,
+      "duration_s": 4365.222222222223,
+      "file_sha256": "35b087b05c40723a78399b44c980f4193de380d3c674f25023bf45bc4962c572",
+      "reused_from_floor": 4
+    },
+    {
+      "floor": 6,
+      "room": 5,
+      "record": "mgh029",
+      "samples": 1751777,
+      "duration_s": 4866.047222222222,
+      "file_sha256": "3cce2852552b50f6007051bb46275c7eb1f129b79ea9e186ad43dd9e7deadcc5",
+      "reused_from_floor": 4
+    },
+    {
+      "floor": 6,
+      "room": 6,
+      "record": "mgh030",
+      "samples": 1815464,
+      "duration_s": 5042.955555555555,
+      "file_sha256": "ef4b3148d0938672b30b2555c0141ab0d1df65f1dd55ff86ab7e484b21192ea4",
+      "reused_from_floor": 4
+    }
+  ]
+}

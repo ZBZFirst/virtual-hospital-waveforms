@@ -1,0 +1,45 @@
+mgh020 8 360/0.476 1663871
+mgh020.dat 212 750(0)/mV 12 0 -746 18685 0 ECG lead I
+mgh020.dat 212 750(0)/mV 12 0 -872 9705 0 ECG lead II
+mgh020.dat 212 750(0)/mV 12 0 -734 6637 0 ECG lead V
+mgh020.dat 212 12.3(-1206)/mmHg 12 0 -1422 54988 0 ART
+mgh020.dat 212 21.36(-1008)/mmHg 12 0 -1302 4866 0 PAP
+mgh020.dat 212 20.12(-998)/mmHg 12 0 -1240 60534 0 CVP
+mgh020.dat 212 1000 12 0 -817 2852 0 Resp. Imp.
+mgh020.dat 212 1000 12 0 -790 45762 0 CO2
+#<age>: 60 <sex>: F <diagnoses>: Axillo-popliteal bypass graft
+# PERTINENT HISTORY:
+#   Coronary disease
+#   Smoker
+# PHARMACOLOGIC SUPPORT:
+#   Dopamine @ 150 mcg/min
+# COMMENTS:
+#   Arrhythmias on mgh137 with potassium therapy on mgh020
+#   Stop/FFW @ 23 min
+#   Bed changed @ 43 min - 53 min
+#   Suctioning @ 54 min - 56 min
+# ELECTROCARDIOGRAPHIC DATA:
+# UNDERLYING RHYTHM:
+#   Junctional rhythm with right bundle branch block @ 96 bpm
+# RHYTHM DISTURBANCES:
+#   Runs of junctional tachycardia
+#   Atrial ectopy
+# ECG INTERPRETATION:
+#   Low voltage
+#   Nonspecific ST segment and T wave abnormalities
+# TECHNICAL COMMENTS:
+#   Wandering baseline
+# HEMODYNAMIC DATA:
+#   ART: 110/70   	MEAN: 75
+#   PAP: 36/20   	PCW: 14 (@ 5 min, 6 min, 66 min)
+#   RAP: 11   	CO:   2.2
+# WAVEFORM PATTERNS:
+#   The abrupt conversion of junctional rhythm to junctional tachycardia creates ringing in the pulmonary arterial tracing and elevation of arterial diastolic pressure.
+#   These changes subside with resumption of a slower rhythm. Central vascular pressures exhibit the pattern of respiratory variation of controlled ventilation.
+# TECHNICAL COMMENTS:
+#   PA zero @ 9 min
+# RESPIRATORY DATA:
+# RATE:   7 bpm
+# MODE OF VENTILATION:
+#   Controlled
+# CO2 RECORDING

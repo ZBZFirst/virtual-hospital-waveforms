@@ -1,0 +1,25 @@
+mgh007 8 360/0.476 1267397
+mgh007.dat 212 1341(242)/mV 12 0 -301 22969 0 ECG lead I
+mgh007.dat 212 1382(-618)/mV 12 0 -1171 59419 0 ECG lead II
+mgh007.dat 212 1295(-452)/mV 12 0 -1095 25338 0 ECG lead V
+mgh007.dat 212 12.17(-1218)/mmHg 12 0 -1515 61321 0 ART
+mgh007.dat 212 19.26(-1016)/mmHg 12 0 -1416 20833 0 PAP
+mgh007.dat 212 19.04(-1007)/mmHg 12 0 -1367 50618 0 CVP
+mgh007.dat 212 1000 12 0 -262 16547 0 Resp. Imp.
+mgh007.dat 212 1000 12 0 -88 58395 0 CO2
+#<age>: 60 <sex>: F <diagnoses>: Multiple trauma; Aortic graft
+# ELECTROCARDIOGRAPHIC DATA:
+# UNDERLYING RHYTHM:
+#   Normal sinus rhythm with first degree heart block @ 85 bpm
+# ECG INTERPRETATION:
+#   Counterclockwise rotation
+# HEMODYNAMIC DATA:
+#   ART: 120/80   	MEAN: 92
+#   PAP: 32/18   	PCW: 12(@ 22 min, 31 min, 40 min)
+#   RAP: 12
+# WAVEFORM PATTERNS:
+#   Classic hemodynamic traces
+# RESPIRATORY DATA:
+# RATE:   16 bpm
+# MODE OF VENTILATION:
+#   Spontaneous

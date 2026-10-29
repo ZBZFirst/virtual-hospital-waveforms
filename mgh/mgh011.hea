@@ -1,0 +1,38 @@
+mgh011 8 360/0.476 1879151
+mgh011.dat 212 1185(0)/mV 12 0 -726 7639 0 ECG lead I
+mgh011.dat 212 1185(0)/mV 12 0 -778 54725 0 ECG lead II
+mgh011.dat 212 1185(0)/mV 12 0 -696 38489 0 ECG lead V
+mgh011.dat 212 11.88(-1217)/mmHg 12 0 -1414 8124 0 ART
+mgh011.dat 212 20.54(-1012)/mmHg 12 0 -1377 7275 0 PAP
+mgh011.dat 212 20.5(-1000)/mmHg 12 0 -1231 8695 0 CVP
+mgh011.dat 212 1000 12 0 -695 45109 0 Resp. Imp.
+mgh011.dat 212 1000 12 0 -82 59242 0 CO2
+#<age>: 70 <sex>: F <diagnoses>: Nephrectomy; Renal artery bypass graft
+# PERTINENT HISTORY:
+#   Mitral regurgitation
+# PHARMACOLOGIC SUPPORT:
+#   TNG paste
+# ELECTROCARDIOGRAPHIC DATA:
+# UNDERLYING RHYTHM:
+#   Normal sinus rhythm with intraventricular conduction defect @ 70 bpm
+# RHYTHM DISTURBANCES:
+#   Unifocal ventricular ectopy occasionally in a quadrageminal pattern
+# ECG INTERPRETATION:
+#   Left atrial enlargement
+#   Probable left ventricular hypertrophy
+#   Old inferior infarct of indeterminate age with persistent ST segment elevation
+#   Apicolateral ST segment and T wave abnormalities consistent with subendocardial ischemia
+# HEMODYNAMIC DATA:
+#   ART: 150/60   	MEAN: 102
+#   PAP: 32/16   	PCW: 10 (@ 9 min, 19 min, 36 min, 36 min)
+#   RAP: 6   	CO: 4.3
+# WAVEFORM PATTERNS:
+#   V waves in right atrial tracing due to ventricular ectopy
+#   Pulsus paradox
+#   Respiratory variation
+# TECHNICAL COMMENTS:
+#   Bolus of 200 ml volume (Ringers Lactate) @ 23 min
+# RESPIRATORY DATA:
+# RATE:   20 bpm
+# MODE OF VENTILATION:
+#   Spontaneous

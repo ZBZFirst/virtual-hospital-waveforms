@@ -1,0 +1,28 @@
+mgh019 8 360/0.476 1483920 15:04:50 31/05/1991
+mgh019.dat 212 286(-374)/mV 12 0 -346 44250 0 ECG lead I
+mgh019.dat 212 209(-116)/mV 12 0 -28 18200 0 ECG lead II
+mgh019.dat 212 246(-44)/mV 12 0 -56 3327 0 ECG lead V
+mgh019.dat 212 11.79(-1478)/mmHg 12 0 -28 32255 0 ART
+mgh019.dat 212 19.52(-1298)/mmHg 12 0 -1067 43481 0 PAP
+mgh019.dat 212 20.32(-1086)/mmHg 12 0 -1057 36399 0 CVP
+mgh019.dat 212 1000 12 0 -61 23813 0 Resp. Imp.
+mgh019.dat 212 1000 12 0 901 3457 0 CO2
+#<age>: 79 <sex>: M <diagnoses>: Resection and grafting of abdominal aortic aneurysm
+# PERTINENT HISTORY:
+#   Smoking
+# ELECTROCARDIOGRAPHIC DATA:
+# UNDERLYING RHYTHM:
+#   Atrial fibrillation @ 90 bpm
+# RHYTHM DISTURBANCES:
+#   Multifocal ventricular ectopy
+# ECG INTERPRETATION:
+#   Non-specific sn wave changes
+# HEMODYNAMIC DATA:
+#   ART: 120/60   	MEAN: 88
+#   PAP: 28/12   	PCW: 8 (@ 23 min, 44 min, 52 min)
+#   RAP: 6   	CO:   3.4
+# RESPIRATORY DATA:
+# RATE:   2/11 bpm
+# MODE OF VENTILATION:
+#   Intermittent mandatory ventilation
+# CO2 RECORDING

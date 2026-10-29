@@ -1,0 +1,249 @@
+{
+  "source": "zebezo_unit_19_six_floor_full_telemetry_v22.blend",
+  "floor_height_m": 3.2,
+  "floors": [
+    {
+      "level": 1,
+      "collection": "FLOOR 01 | original ward assets",
+      "file": "ward_floor.glb",
+      "selected_objects": 860,
+      "bounds_blender_xyz_m": {
+        "min": [
+          -17.100000381469727,
+          -12.100001335144043,
+          -0.2199999988079071
+        ],
+        "max": [
+          17.100000381469727,
+          12.100000381469727,
+          2.700000047683716
+        ]
+      },
+      "roof": {
+        "collection": "Architecture | roof - toggle for exterior",
+        "file": "roof_floor_01.glb",
+        "selected_objects": 1,
+        "bounds_blender_xyz_m": {
+          "min": [
+            -17.0,
+            -12.0,
+            2.700000047683716
+          ],
+          "max": [
+            17.0,
+            12.0,
+            2.8999998569488525
+          ]
+        }
+      }
+    },
+    {
+      "level": 2,
+      "collection": "FLOOR 02 | linked ward assets",
+      "file": "ward_floor_02.glb",
+      "selected_objects": 794,
+      "bounds_blender_xyz_m": {
+        "min": [
+          -17.100000381469727,
+          -12.100001335144043,
+          2.9800000190734863
+        ],
+        "max": [
+          17.100000381469727,
+          12.100000381469727,
+          5.900000095367432
+        ]
+      },
+      "roof": {
+        "collection": "Floor 02 | Architecture | roof - toggle for exterior",
+        "file": "roof_floor_02.glb",
+        "selected_objects": 1,
+        "bounds_blender_xyz_m": {
+          "min": [
+            -17.0,
+            -12.0,
+            5.900000095367432
+          ],
+          "max": [
+            17.0,
+            12.0,
+            6.099999904632568
+          ]
+        }
+      }
+    },
+    {
+      "level": 3,
+      "collection": "FLOOR 03 | linked ward assets",
+      "file": "ward_floor_03.glb",
+      "selected_objects": 794,
+      "bounds_blender_xyz_m": {
+        "min": [
+          -17.100000381469727,
+          -12.100001335144043,
+          6.180000305175781
+        ],
+        "max": [
+          17.100000381469727,
+          12.100000381469727,
+          9.100000381469727
+        ]
+      },
+      "roof": {
+        "collection": "Floor 03 | Architecture | roof - toggle for exterior",
+        "file": "roof_floor_03.glb",
+        "selected_objects": 1,
+        "bounds_blender_xyz_m": {
+          "min": [
+            -17.0,
+            -12.0,
+            9.09999942779541
+          ],
+          "max": [
+            17.0,
+            12.0,
+            9.300000190734863
+          ]
+        }
+      }
+    },
+    {
+      "level": 4,
+      "collection": "FLOOR 04 | linked ward assets",
+      "file": "ward_floor_04.glb",
+      "selected_objects": 794,
+      "bounds_blender_xyz_m": {
+        "min": [
+          -17.100000381469727,
+          -12.100001335144043,
+          9.380000114440918
+        ],
+        "max": [
+          17.100000381469727,
+          12.100000381469727,
+          12.300000190734863
+        ]
+      },
+      "roof": {
+        "collection": "Floor 04 | Architecture | roof - toggle for exterior",
+        "file": "roof_floor_04.glb",
+        "selected_objects": 1,
+        "bounds_blender_xyz_m": {
+          "min": [
+            -17.0,
+            -12.0,
+            12.299999237060547
+          ],
+          "max": [
+            17.0,
+            12.0,
+            12.5
+          ]
+        }
+      }
+    },
+    {
+      "level": 5,
+      "collection": "FLOOR 05 | linked ward assets",
+      "file": "ward_floor_05.glb",
+      "selected_objects": 794,
+      "bounds_blender_xyz_m": {
+        "min": [
+          -17.100000381469727,
+          -12.100001335144043,
+          12.579999923706055
+        ],
+        "max": [
+          17.100000381469727,
+          12.100000381469727,
+          15.5
+        ]
+      },
+      "roof": {
+        "collection": "Floor 05 | Architecture | roof - toggle for exterior",
+        "file": "roof_floor_05.glb",
+        "selected_objects": 1,
+        "bounds_blender_xyz_m": {
+          "min": [
+            -17.0,
+            -12.0,
+            15.499999046325684
+          ],
+          "max": [
+            17.0,
+            12.0,
+            15.699999809265137
+          ]
+        }
+      }
+    },
+    {
+      "level": 6,
+      "collection": "FLOOR 06 | linked ward assets",
+      "file": "ward_floor_06.glb",
+      "selected_objects": 794,
+      "bounds_blender_xyz_m": {
+        "min": [
+          -17.100000381469727,
+          -12.100001335144043,
+          15.779999732971191
+        ],
+        "max": [
+          17.100000381469727,
+          12.100000381469727,
+          18.69999885559082
+        ]
+      },
+      "roof": {
+        "collection": "Floor 06 | Architecture | roof - toggle for exterior",
+        "file": "roof_floor_06.glb",
+        "selected_objects": 1,
+        "bounds_blender_xyz_m": {
+          "min": [
+            -17.0,
+            -12.0,
+            18.69999885559082
+          ],
+          "max": [
+            17.0,
+            12.0,
+            18.899999618530273
+          ]
+        }
+      }
+    }
+  ],
+  "hospital_shell": {
+    "file": "hospital_shell.glb",
+    "selected_objects": 18,
+    "bounds_blender_xyz_m": {
+      "min": [
+        -17.100000381469727,
+        -12.100001335144043,
+        -0.2199999988079071
+      ],
+      "max": [
+        17.100000381469727,
+        12.100000381469727,
+        18.899999618530273
+      ]
+    }
+  },
+  "elevator": {
+    "collection": "ELEVATOR | travelling cab and controls",
+    "file": "elevator_cab.glb",
+    "selected_objects": 12,
+    "bounds_blender_xyz_m": {
+      "min": [
+        -15.960000038146973,
+        -6.215000152587891,
+        0.009999997913837433
+      ],
+      "max": [
+        -12.039999961853027,
+        -2.5850000381469727,
+        2.3949999809265137
+      ]
+    }
+  }
+}

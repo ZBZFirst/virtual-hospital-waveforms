@@ -1,0 +1,45 @@
+mgh030 8 360/0.476 1815464
+mgh030.dat 212 705(-16)/mV 12 0 -744 43894 0 ECG lead I
+mgh030.dat 212 675/mV 12 0 -757 46262 0 ECG lead II
+mgh030.dat 212 625(11)/mV 12 0 -754 48303 0 ECG lead V
+mgh030.dat 212 11.81(-1240)/mmHg 12 0 -646 10147 0 ART
+mgh030.dat 212 20.52(-1027)/mmHg 12 0 -1079 29952 0 PAP
+mgh030.dat 212 20/mmHg 12 0 -387 35772 0 CVP
+mgh030.dat 212 1000 12 0 -741 46296 0 Resp. Imp.
+mgh030.dat 212 1000 12 0 -95 487 0 CO2
+#<age>: 67 <sex>: M <diagnoses>: Esophagogastrectomy; Sepsis
+# PERTINENT HISTORY:
+#   Smoker
+#   Aspiration
+# PHARMACOLOGIC SUPPORT:
+#   Dopamine @ 240 mcg/min
+#   Levophed @ 4.8 mcg/min
+# GENERAL COMMENTS:
+#   Bedmaking @ 49 min
+#   Stop/FFW @ 37 min and 64 min - 65 min
+# ELECTROCARDIOGRAPHIC DATA:
+# UNDERLYING RHYTHM:
+#   Normal sinus rhythm with right bundle branch block @ 84 bpm
+# RHYTHM DISTURBANCES:
+#   Atrial ectopy with occasional aberrant conduction
+#   Atrial fibrillation
+#   Atrial flutter with 2: 1 conduction @ 33 min
+#   Unifocal ventricular ectopy
+# ECG INTERPRETATION:
+#   Left anterior hemiblock
+#   Left axis deviation
+#   Non-specific sn wave changes
+# HEMODYNAMIC DATA:
+#   ART: 124/58 (pedal)
+#   PAP: 50/25   	PCW: 15 (@ 12 min, 47 min, 69 min)
+#   RAP: 14
+# WAVEFORM PATTERNS:
+#   Pulmonary hypertension
+# TECHNICAL COMMENTS:
+#   Zero @ 11 min
+#   PAP/CVP on same transducer
+# RESPIRATORY DATA:
+# RATE:   18/18 bpm
+# MODE OF VENTILATION:
+#   Controlled
+# CO2 RECORDING

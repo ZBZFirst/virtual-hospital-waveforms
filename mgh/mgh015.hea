@@ -1,0 +1,37 @@
+mgh015 8 360/0.476 1740097 13:31:58 08/11/1991
+mgh015.dat 212 1185(-100)/mV 12 0 -307 11663 0 ECG Lead I
+mgh015.dat 212 1185(-100)/mV 12 0 -102 61191 0 ECG Lead II
+mgh015.dat 212 1185(-100)/mV 12 0 -6 17794 0 ECG Lead V
+mgh015.dat 212 12.03(-1282)/mmHg 12 0 2047 60055 0 ART 
+mgh015.dat 212 30.42(-1150)/mmHg 12 0 -1484 40849 0 PAP
+mgh015.dat 212 19.6(-1049)/mmHg 12 0 -55 42312 0 CVP
+mgh015.dat 212 1000 12 0 -123 34647 0 Resp. Imp.
+mgh015.dat 212 1000 12 0 -466 51837 0 CO2
+#<age>: 73 <sex>: M <diagnoses>: Femoral-popliteal bypass graft
+# PERTINENT HISTORY:
+#   Coronary disease (unstable angina)
+#   Cerebral vascular disease
+#   Smoking
+# PHARMACOLOGIC SUPPORT:
+#   TNG @ 50 mcg/min
+# ELECTROCARDIOGRAPHIC DATA:
+# UNDERLYING RHYTHM:
+#   Normal sinus rhythm with first degree A-V block and incomplete left bundle branch block @ 75 bpm
+# RHYTHM DISTURBANCES:
+#   Atrial tachycardia with 2: 1 block
+#   ? Mobitz II 2: 1 to 4: 1 block
+#   Unifocal ventricular ectopy (rare)
+# ECG INTERPRETATION:
+#   Diffuse ST segment and T wave abnormalities consistent with digitalis effect.
+#   subendocardial ischemia
+# HEMODYNAMIC DATA:
+#   ART: 120/60   	MEAN: 71
+#   PAP: 36/16   	PCW: 16 (@ 13 min, 39 min, 44 min)
+#   RAP: 11   	CO: 3.6
+# WAVEFORM PATTERNS:
+#   "Catheter Whip" in PA trace
+# RESPIRATORY DATA:
+# RATE:   6/24 bpm
+# MODE OF VENTILATION:
+#   Intermittent mandatory ventilation
+# CO2 RECORDING

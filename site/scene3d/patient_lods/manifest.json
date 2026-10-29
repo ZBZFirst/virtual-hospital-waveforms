@@ -1,0 +1,73 @@
+{
+  "schema": "zebezo.patient-lods.v1",
+  "patient_id": "Patient_001",
+  "room_visibility_key": "unit_19/room_01",
+  "source_room_blend": "../../zebezo_unit_19_room_01_patient_lods_v3.blend",
+  "asset_origin": "Bed center at floor level; Blender meters converted to glTF Y-up",
+  "source_model": "HRA male v24 patient and fitted Portex SACETT 100/189/080",
+  "levels": [
+    {
+      "level": 0,
+      "view": "patient close-up",
+      "file": "patient_001_lod0.glb",
+      "blender_faces": 172152,
+      "blender_face_ratio": 1.0,
+      "glb_triangles": 555851,
+      "glb_meshes": 57,
+      "bytes": 11092996,
+      "sha256": "b9016fd785b56480cbd07cc710ba1d14f0dc08f9457518a392054098bfc503d5",
+      "has_morph_targets": true
+    },
+    {
+      "level": 1,
+      "view": "inside patient room",
+      "file": "patient_001_lod1.glb",
+      "blender_faces": 37050,
+      "blender_face_ratio": 0.2152,
+      "glb_triangles": 40510,
+      "glb_meshes": 8,
+      "bytes": 1034948,
+      "sha256": "b1be74bc487d712bbcc38f57503fdda4ec864d1f852ea732c805f3a0cc0542b3",
+      "has_morph_targets": true
+    },
+    {
+      "level": 2,
+      "view": "hospital floor",
+      "file": "patient_001_lod2.glb",
+      "blender_faces": 5780,
+      "blender_face_ratio": 0.0336,
+      "glb_triangles": 5880,
+      "glb_meshes": 4,
+      "bytes": 129096,
+      "sha256": "2dff8c086c72fb03d6f1fe3bf6c73c9447e6584915b94bf4cd3611bd06b3446b",
+      "has_morph_targets": false
+    }
+  ],
+  "lod3": {
+    "view": "hospital campus",
+    "mesh": null,
+    "meaning": "patient hidden; building and status only"
+  },
+  "runtime_visibility_hints": {
+    "frustum_culling": true,
+    "room_portal_culling": "Hide the interior unless the camera is in the room or a visible open portal sees it.",
+    "occlusion_culling": "Optional after profiling; frustum culling does not hide objects behind walls.",
+    "distance_detail_culling": "Hide subpixel ETT accessories and ventilator details at floor scale.",
+    "distance_thresholds": "Choose in the viewer from projected size and room visibility; no fixed distances calibrated yet."
+  },
+  "shared_state": {
+    "source": "Room 01 adjustable bed - SELECT THIS",
+    "properties": [
+      "admitted",
+      "breaths_per_minute",
+      "head_angle_degrees"
+    ],
+    "clinical_status": "illustrative virtual baseline, not verified real admission",
+    "ett_lips_station_cm": 23
+  },
+  "limitations": {
+    "browser_lod_switching": "GLBs exported; runtime switching and room culling not installed.",
+    "head_angle": "Detailed LODs aligned at 0 degrees; head articulation needs a deformation rig.",
+    "lod1_blanket": "Portable settled mesh; complete close-up scene asset retains baked cloth physics."
+  }
+}

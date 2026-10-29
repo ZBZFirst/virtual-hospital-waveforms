@@ -1,0 +1,37 @@
+mgh023 8 360/0.476 1777790
+mgh023.dat 212 742(-51)/mV 12 0 -711 4807 0 ECG lead I
+mgh023.dat 212 719(-313)/mV 12 0 -896 6831 0 ECG lead II
+mgh023.dat 212 710(-24)/mV 12 0 -722 64432 0 ECG lead V
+mgh023.dat 212 8.12(-800)/mmHg 12 0 -1468 15650 0 ART
+mgh023.dat 212 37.84(-1327)/mmHg 12 0 -1341 31633 0 PAP
+mgh023.dat 212 20.5(-1025)/mmHg 12 0 -1307 58488 0 CVP
+mgh023.dat 212 1000 12 0 -773 51348 0 Resp. Imp.
+mgh023.dat 212 1000 12 0 -1377 20194 0 CO2
+#<age>: 78 <sex>: M <diagnoses>: Cerebral hemorrhage
+# PERTINENT HISTORY:
+#   Coronary disease
+# GENERAL COMMENTS:
+#   Stop/FFW @ 35 min - 68 min
+# ELECTROCARDIOGRAPHIC DATA:
+# UNDERLYING RHYTHM:
+#   Atrial flutter with variable block @ 60 bpm, occasional aberrant conduction
+# RHYTHM DISTURBANCES:
+#   Conversion to atrial fibrillation, occasional aberrant conduction
+#   Ventricular ectopy, occasional bigeminy
+# ECG INTERPRETATION:
+#   Antero-septal infarct
+#   Antero-apical ischemia
+#   Nonspecific T wave abnormalities
+# TECHNICAL COMMENTS:
+#   Wandering baseline in Leads I and II near end of trace
+# HEMODYNAMIC DATA:
+#   ART: 150/50
+#   PAP: 49/26   	PCW: 21 (not recorded)
+#   RAP: 14
+# WAVEFORM PATTERNS:
+#   Pulmonary hypertension
+#   "Catheter whip" in pulmonary arterial trace
+# RESPIRATORY DATA:
+# RATE:   12/12 bpm
+# MODE OF VENTILATION:
+#   Controlled

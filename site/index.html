@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ventilator and Telemetry Virtual Hospital</title>
+  <link rel="canonical" href="https://www.zebezo.org/respiratory-therapy/ventilator-waveform-library/">
+  <meta name="description" content="Explore 145 UC Davis ventilator recordings and 24 independent PhysioNet MGH telemetry recordings in a virtual hospital.">
+  <link rel="stylesheet" href="styles.css?v=20261021-feed-toolbar">
+  <link rel="stylesheet" href="unit-cubes.css?v=20261020-hospital-spacing">
+  <link rel="stylesheet" href="grid-monitor.css?v=20261021-feed-toolbar">
+</head>
+<body>
+  <main class="atlas-screen" aria-label="3D virtual hospitals">
+    <canvas id="atlas" aria-hidden="true"></canvas>
+    <iframe id="hospitalScene" title="Interactive 3D virtual hospitals" src="scene3d/?view=hospital&amp;embedded=1" loading="eager"></iframe>
+    <div id="sceneLoading" class="scene-loading" role="status" aria-live="polite">
+      <div class="scene-loading-card"><span class="scene-spinner" aria-hidden="true"></span><strong id="sceneLoadingTitle">Loading 3D hospitals…</strong><p id="sceneLoadingMessage">Preparing the hospital scene. Recording transfer progress appears below.</p><button id="retryScene" type="button" hidden>Reload scene</button></div>
+    </div>
+    <header class="site-head">
+      <div><p class="eyebrow">Virtual teaching hospital · independent recordings</p><h1>Ventilator and Telemetry Waveform Library</h1><p class="subhead">Select a hospital, floor, and room. Open a UC Davis room's full waveform from the scene controls; MGH telemetry appears on its room monitor.</p><p class="source-links"><a href="https://zenodo.org/records/14884306">UC Davis ventilator source</a> · <a href="https://physionet.org/content/mghdb/1.0.0/">PhysioNet MGH/MF source</a> · <a href="https://github.com/ZBZFirst/file/tree/master/WaveformBackups">UC Davis files on GitHub</a></p></div>
+      <button id="mobileMenuToggle" class="mobile-menu-toggle" type="button" aria-controls="mobileMenu" aria-expanded="false">Menu</button>
+      <nav id="mobileMenu" class="atlas-actions" aria-label="Hospital controls"><div class="mobile-menu-heading"><strong>Hospital controls</strong><button id="mobileMenuClose" type="button" aria-label="Close hospital controls">Close</button></div><div id="datasetStats" class="dataset-stats">Loading inventory…</div><div class="atlas-buttons"><label class="flow-direction">Flow colors <select id="flowDirection" aria-label="Airflow color direction"><option value="normal">− blue / + red</option><option value="reverse">− red / + blue</option></select></label><button id="muteAll" type="button">Mute All</button><button id="openHospitals" type="button">Hospital list</button><button id="openBedManager" type="button">Bed Manager</button><button id="openDirectory" type="button">Room directory</button><button id="zoomOut" type="button" aria-label="Zoom out">−</button><button id="zoomIn" type="button" aria-label="Zoom in">+</button><button id="resetAtlas" type="button">Center</button></div><p class="drawer-source-links"><a href="https://zenodo.org/records/14884306">UC Davis dataset</a> · <a href="https://github.com/ZBZFirst/file/tree/master/WaveformBackups">Recording files</a></p></nav>
+    </header>
+    <div id="mobileMenuBackdrop" class="mobile-menu-backdrop" hidden></div>
+    <div class="atlas-footer"><span class="atlas-key">Illustrative rooms and anatomy · source recordings are not paired patients or clinical monitoring</span><span id="activityStatus">Loading waveform signals…</span><span id="sessionClock" class="session-clock">Session 0:00.00 · 1×</span><span class="mobile-hint">One finger to orbit · two fingers to pan or pinch</span><span id="atlasStatus"></span><div class="segment-progress"><progress id="segmentProgressBar" value="0" max="100" aria-label="First recording segments verified"></progress><span id="segmentProgressText" role="status">Preparing 30-minute recording segments…</span><details id="segmentFailures" hidden><summary>Failed feeds</summary><ul id="segmentFailureList"></ul></details><button id="retrySegments" type="button" hidden>Retry failed</button></div></div>
+  </main>
+
+  <div id="directoryOverlay" class="overlay" hidden>
+    <aside class="list-panel popup directory-popup" role="dialog" aria-modal="true" aria-label="Room directory">
+      <div class="panel-head"><div><h2>Room directory</h2><p>Every occupied room opens one CSV feed</p></div><button id="closeDirectory" type="button" aria-label="Close room directory">Close</button></div>
+      <label class="search-label" for="search">Search filename, ID, RPi, or mode suffix</label>
+      <input id="search" type="search" placeholder="Search recordings…" autocomplete="off">
+      <div id="listCount" class="list-count"></div>
+      <div id="recordingList" class="recording-list"></div>
+    </aside>
+  </div>
+
+  <div id="detailOverlay" class="overlay" hidden>
+    <section class="detail-panel popup" role="dialog" aria-modal="true" aria-label="Selected database or waveform">
+      <div class="detail-heading">
+        <div>
+          <p class="eyebrow" id="streamLabel">ALL-FEEDS DATABASE</p>
+          <h2 id="streamTitle">Virtual hospital catalog</h2>
+          <p id="streamMeta" class="stream-meta">Select a nursing station or a room feed.</p>
+        </div>
+        <div class="detail-actions"><div id="loadStatus" role="status"></div><button id="speakerBtn" type="button" hidden aria-pressed="false" aria-label="Enable this feed's sound">🔇 Sound off</button><output id="midiReadout" hidden aria-live="off"></output><button id="viewOnCube" type="button" hidden>View on Cube</button><button id="muteAllDetail" type="button">Mute All</button><button id="closeDetail" type="button" aria-label="Close details">Close</button></div>
+      </div>
+      <nav id="breadcrumbs" class="breadcrumbs" aria-label="Atlas location"></nav>
+      <div id="databasePanel" class="database-panel"></div>
+      <div id="waveformPanel" data-room-mode="review" hidden>
+      <div class="room-feed-toolbar">
+        <nav class="room-feed-switch" aria-label="Selected room feed"><button id="room-feed-live" type="button" class="selected" aria-pressed="true">Real-Time Feed</button><button id="room-feed-review" type="button" aria-pressed="false">Review Feed</button></nav>
+        <div class="transport review-only">
+        <button id="startBtn" type="button" disabled>Start</button>
+        <button id="playBtn" type="button" disabled>Play</button>
+        <button id="pauseBtn" type="button" disabled>Pause</button>
+        <button id="stopBtn" type="button" disabled>Stop</button>
+        <button id="room-replay-feed" type="button">Replay real-time feed</button>
+        <label>Speed <select id="speed"><option value="1" selected>1×</option><option value="10">10×</option><option value="50">50×</option><option value="200">200×</option><option value="1000">1000×</option></select></label>
+        <label>Window <select id="window"><option value="10">10 s</option><option value="15">15 s</option><option value="30" selected>30 s</option><option value="60">60 s</option><option value="120">120 s</option></select></label>
+        </div>
+        <div class="room-live-controls live-only"><span id="room-live-state" class="sr-only" role="status">PAUSED</span><button id="room-live-pause" type="button">Start stream</button><button id="room-live-restart" type="button">Replay feed</button><label>Speed <select id="room-live-speed"><option value="1" selected>1× source time</option><option value="10">10×</option><option value="60">60×</option></select></label><label>Window <select id="room-live-window"><option value="15">15 s</option><option value="30" selected>30 s</option><option value="60">60 s</option></select></label></div>
+        <span id="room-live-progress" class="live-only">Waiting for source samples</span>
+      </div>
+      <div class="scrub-row review-only"><label for="scrub">Position</label><input id="scrub" type="range" min="0" max="1000" value="0" disabled><output id="timeReadout">0:00.00 / 0:00.00</output></div>
+      <div class="room-live-stats live-only"><div><span>RECEIVED SOURCE TIME</span><strong id="room-live-time">00:00:00</strong></div><div><span>COMPLETE BREATHS SINCE OPENING</span><strong id="room-live-breaths">0</strong></div><div><span>MEDIAN VTi IN CURRENT BIN</span><strong id="room-live-vti">—</strong></div><div><span>BIN BREATHS</span><strong id="room-live-bin-breaths">0</strong></div></div>
+      <div class="room-viewer">
+        <div class="signal-card overview-card review-only"><div class="chart-head"><h3>Full stream overview</h3><span>drag to seek · complete recording</span></div><canvas id="overview" aria-label="Full flow overview with playback position"></canvas></div>
+        <section class="room-waveform-shell" aria-label="Selected room waveform viewer">
+          <div class="room-waveform-heading"><div><p class="eyebrow">VISIBLE SOURCE WINDOW · 50 Hz</p><h3>Flow &amp; airway pressure</h3></div><div class="room-perspective" role="group" aria-label="Computation perspective"><button id="room-view-zebezo" type="button" aria-pressed="true" class="selected">⌁ ZeBeZo</button><button id="room-view-hahnicity" type="button" aria-pressed="false">◈ Hahnicity</button></div><span id="room-analysis-breath" class="room-breath-label">Awaiting completed breath</span><span id="room-analysis-source" class="room-source-badge">SOURCE DERIVED</span><button id="room-analysis-toggle" type="button">Hide analysis cards</button><button id="room-analysis-reset" type="button">Reset cards</button><button id="room-analysis-about" type="button">About</button></div>
+          <div id="room-chart-stage"><div class="signal-card"><div class="chart-head"><h3>Flow vs. estimated time <small>L/min</small></h3><span id="flowValue">—</span></div><canvas id="flowChart" aria-label="Flow waveform near playback position"></canvas><p id="flowBreathValue" class="breath-value">No completed breath at this position</p></div>
+          <div class="signal-card"><div class="chart-head"><h3>Airway pressure vs. estimated time <small>cmH₂O</small></h3><span id="pressureValue">—</span></div><canvas id="pressureChart" aria-label="Pressure waveform near playback position"></canvas><p id="pressureBreathValue" class="breath-value">No completed breath at this position</p></div></div>
+        </section>
+        <section class="room-breath-navigator signal-card review-only"><div class="chart-head"><h3>Breaths in this window</h3><span id="room-breath-count">No complete breaths in view</span></div><div id="room-breath-list"></div><div class="room-window-nav"><button id="room-prev-window" type="button">← Previous window</button><span id="room-window-range">—</span><button id="room-next-window" type="button">Next window →</button></div></section>
+        <section class="room-live-summary signal-card live-only"><div class="chart-head"><h3>Breaths in this window</h3><span id="room-live-window-count">0 complete breaths in window</span></div><div id="room-live-recent">Awaiting BE markers…</div><div class="room-bin-heading"><h3>Completed-breath time bins</h3><div id="room-bin-options"><button type="button" data-room-bin="5" class="selected">5 min</button><button type="button" data-room-bin="10">10 min</button><button type="button" data-room-bin="15">15 min</button><button type="button" data-room-bin="30">30 min</button></div></div><div class="room-bin-scroll"><table><thead><tr><th>Source interval</th><th>Status</th><th>Breaths</th><th>Median VTi</th><th>Median VTe</th><th>Median peak pressure</th><th>Median PEEP</th></tr></thead><tbody id="room-bin-rows"><tr><td colspan="7">Awaiting completed breaths</td></tr></tbody></table></div></section>
+        <details class="room-optional review-only"><summary>Calculated volume and 3D waveform path</summary><label class="room-volume-option"><input id="volumeToggle" type="checkbox" checked> Show calculated volume</label><div class="room-optional-grid">
+          <div class="signal-card" id="volumeCard"><div class="chart-head"><h3>Calculated volume vs. estimated time (mL)</h3><span id="volumeValue">—</span></div><canvas id="volumeChart" aria-label="Calculated breath-relative volume waveform near playback position in milliliters"></canvas><p id="breathValue" class="breath-value">No completed breath at this position</p></div>
+          <div class="signal-card space-card"><div class="chart-head"><h3>3D waveform path</h3><span id="pathLabel">time · flow · pressure</span></div><label class="path-axis-label">Third axis <select id="pathAxis"><option value="pressure">Pressure</option><option value="volume">Calculated volume (mL)</option></select></label><canvas id="wave3d" aria-label="Three-dimensional waveform path"></canvas><p>Drag to rotate the path. The bright marker is the current sample.</p></div>
+        </div></details>
+      </div>
+      </div>
+      <details id="recordingNotes" class="recording-notes">
+        <summary id="notesSummary">About this dataset</summary>
+        <div class="recording-notes-body">
+          <section id="recordingInfo" hidden><h3>Recording details</h3><dl><div><dt>Filename</dt><dd id="recordingFilename"></dd></div><div><dt>RPi</dt><dd id="recordingRpi"></dd></div><div><dt>Shifted start</dt><dd id="recordingStart"></dd></div><div><dt>Samples</dt><dd id="recordingSamples"></dd></div><div><dt>Breath starts</dt><dd id="recordingBreaths"></dd></div></dl></section>
+          <section><h3>Display and measurements</h3><p>Observational playback and optional musical sonification only. Node colors are visual signal mappings, not clinical alarms. The atlas samples synchronized source values at 10 Hz; opened waveform charts and derived breath measures use the full 50 Hz feed.</p><p>PIFR is maximum positive flow; PEFR is the magnitude of minimum negative flow. Peak pressure is the maximum pressure sample. PEEP is estimated from the final five pressure samples when expiration is present. MAP is the time-weighted mean airway pressure over a complete sampled breath, not mean arterial pressure.</p><p>Calculated volume integrates signed flow in L/min within each marked breath; positive flow is inspiration. VTi and VTe sum positive and negative portions separately. Breath-relative volume resets at each breath start; VTi minus VTe is retained for completed breaths. Missing or invalid intervals have no derived breath measures.</p></section>
+          <section><h3>Timing and identity</h3><p>Most time axes are estimated from numeric sample index at 50 Hz; the one timestamped recording uses its sample timestamps for integration. There is no change detection, clinical interpretation, or live patient connection. Unit and room names are virtual assignments, not real hospital locations. The displayed Patient ID is the filename prefix; it does not confirm patient identity. Date-like filenames are shifted and do not establish a shared patient timeline. Mode words are filename annotations, not a measured mode channel.</p></section>
+          <section><h3>Source</h3><p><a href="https://zenodo.org/records/14884306">UC Davis dataset on Zenodo</a> (DOI: 10.5281/zenodo.14884306), GPL-3.0-or-later.</p></section>
+        </div>
+      </details>
+    </section>
+  </div>
+  <div id="unitCubeOverlay" class="cube-overlay" hidden></div>
+  <div id="gridMonitor" class="grid-monitor" hidden></div>
+  <script src="signal-mapping.js?v=20261007-doppler-audio2" defer></script>
+  <script src="volume.js?v=20261008-volume1" defer></script>
+  <script src="breath-metrics.js?v=20261008-breath-metrics1" defer></script>
+  <script src="segment-store.js?v=20261008-segments1" defer></script>
+  <script src="segmented-waveform.js?v=browser-room-2" defer></script>
+  <script src="hospital-layout.js?v=20261008-floor-maps2" defer></script>
+  <script src="hospital-system.js?v=20261020-hospital-spacing" defer></script>
+  <script src="floor-plan.js?v=20261020-hospital-spacing" defer></script>
+  <script src="research-display.js?v=browser-room-2" defer></script>
+  <script src="browser-research.js?v=browser-room-2" defer></script>
+  <script src="room-analysis.js?v=20261020-mobile-analysis" defer></script>
+  <script src="chart-axis.js?v=20261021-feed-toolbar" defer></script>
+  <script src="room-live.js?v=20261021-finite-feeds" defer></script>
+  <script src="grid-monitor.js?v=20261021-finite-feeds" defer></script>
+  <script src="unit-cubes.js?v=20261021-finite-feeds" defer></script>
+  <script src="viewer.js?v=20261021-finite-feeds" defer></script>
+  <dialog id="room-about"><form method="dialog"><button aria-label="Close">Close</button></form><h2>Room waveform perspectives</h2><p>ZeBeZo cards show observational measures calculated from loaded 50 Hz samples after a completed BS/BE breath. Hahnicity cards show experimental JavaScript ports of selected ventMAP metadata, ventparliament mechanics, and PVA heuristic calculations. They run in this browser; Python repository functions are not executed on the server. A card can lag while analysis runs. Neither perspective changes waveform playback. This is not a clinical tool.</p></dialog>
+</body>
+</html>

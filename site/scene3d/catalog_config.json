@@ -1,0 +1,4 @@
+{
+  "mgh_base": "../../mgh/",
+  "note": "Relative path for GitHub Pages or a local server rooted at this repository."
+}

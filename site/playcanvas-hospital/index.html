@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PlayCanvas Hospital Prototype · ZeBeZo</title>
+  <script type="module" crossorigin src="./assets/index-Cion6Uz5.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-B_bw9XdR.css">
+</head>
+<body>
+  <header>
+    <div><p class="eyebrow">VIRTUAL HOSPITAL · PLAYCANVAS PROTOTYPE</p><h1>One building, four live floor slots</h1><p class="subtitle">Editor-ready scene structure driven by the current Bed Manager layout</p></div>
+    <nav><a href="../">Waveform library</a></nav>
+  </header>
+  <main>
+    <section class="stage" aria-label="Interactive PlayCanvas hospital building">
+      <canvas id="application" aria-label="Interactive 3D virtual hospital"></canvas>
+      <p class="hint">Tap a hospital to focus · tap a floor to open it · tap a room or Nursing twice for waveforms · drag to orbit · two fingers to pan or pinch</p>
+      <p class="watermark">PLAYCANVAS ENGINE · ONE BUILDING PROTOTYPE</p>
+      <p id="status" class="status" role="status">Loading scene…</p>
+      <button id="inspectorDock" class="inspector-dock" type="button" aria-controls="buildingInspector" aria-expanded="false">Building inspector</button>
+    </section>
+    <aside id="buildingInspector" aria-label="Building inspector">
+      <div class="inspector-heading"><p class="eyebrow">BUILDING INSPECTOR</p><button id="inspectorClose" type="button" aria-label="Dock building inspector">Dock panel</button></div>
+      <label for="hospitalSelect">Virtual hospital</label>
+      <select id="hospitalSelect"></select>
+      <p id="hospitalSummary" class="summary"></p>
+      <button id="openHospital" class="view-action" type="button" disabled>Open Hospital View</button>
+      <h2>Floors</h2>
+      <div id="floorList" class="floor-list"></div>
+      <button id="assemble" type="button" hidden>Assemble building</button>
+      <h2 id="unitTitle">Selected unit</h2>
+      <button id="nursingSelect" class="view-action" type="button" disabled>Select Nursing station</button>
+      <button id="openUnit" class="view-action" type="button" disabled>Open Unit View</button>
+      <h2 id="roomTitle">Rooms on Floor 1</h2>
+      <div id="roomList" class="room-list"></div>
+      <p id="selection" class="selection">Select a window or room.</p>
+      <button id="openRoom" class="view-action" type="button" disabled>Open Room View</button>
+      <p class="note">These are virtual placements of recording feeds, not clinical locations. Windows show occupancy only.</p>
+    </aside>
+  </main>
+</body>
+</html>

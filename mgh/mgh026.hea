@@ -1,0 +1,38 @@
+mgh026 8 360/0.476 1728000  7:19:39 03/06/1991
+mgh026.dat 212 250(-320)/mV 12 0 -326 -767 0 ECG lead I
+mgh026.dat 212 250/mV 12 0 25 -32343 0 ECG lead II
+mgh026.dat 212 250(-10)/mV 12 0 -103 18090 0 ECG lead V
+mgh026.dat 212 14.95(-1457)/mmHg 12 0 202 -29203 0 ART
+mgh026.dat 212 20(-990)/mmHg 12 0 -51 30787 0 PAP
+mgh026.dat 212 19.78(-1185)/mmHg 12 0 2047 -17219 0 CVP
+mgh026.dat 212 1000 12 0 364 -12662 0 Resp. Imp.
+mgh026.dat 212 1000 12 0 985 -11128 0 CO2
+#<age>: 74 <sex>: F <diagnoses>: Aorto-bifemoral bypass graft
+# PERTINENT HISTORY:
+#   Coronary disease
+#   Smoker
+# PHARMACOLOGIC SUPPORT:
+#   TNG @ 50 mcg/min, then 100 mcg/min
+# ELECTROCARDIOGRAPHIC DATA:
+# UNDERLYING RHYTHM:
+#   Sinus tachycardia with right bundle branch block @ 100 bpm
+# RHYTHM DISTURBANCES:
+#   Multifocal ventricular ectopy with occasional bigeminy, couplets, and fusion beats (0-256)
+#   ? Supraventricular tachycardia @ 24 min
+# ECG INTERPRETATION:
+#   Non-specific sn wave changes
+#   Possible old anterolateral scar
+# TECHNICAL COMMENTS:
+#   RA electrode disconnected/re-positioned @ 18 min
+# HEMODYNAMIC DATA:
+#   ART: 160/60   	MEAN: 88
+#   PAP: 40/16   	PCW: 16 (@ 27 min, 28 min, 65 min)
+#   RAP: 8   	CO:   5.6
+# WAVEFORM PATTERNS:
+#   PA line repositioned @ 17 min, 29 min
+# TECHNICAL COMMENTS:
+#   Zero/col/pop-test sequence @ 41 min - 50 min
+# RESPIRATORY DATA:
+# RATE:   16 bpm
+# MODE OF VENTILATION:
+#   Spontaneous

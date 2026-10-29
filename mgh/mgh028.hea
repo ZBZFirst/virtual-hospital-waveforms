@@ -1,0 +1,55 @@
+mgh028 8 360/0.476 1571480
+mgh028.dat 212 750/mV 12 0 -795 7667 0 ECG lead I
+mgh028.dat 212 750/mV 12 0 -813 63501 0 ECG lead II
+mgh028.dat 212 750/mV 12 0 -754 59587 0 ECG lead V
+mgh028.dat 212 11.86(-1230)/mmHg 12 0 712 31782 0 ART
+mgh028.dat 212 20.84(-1063)/mmHg 12 0 -767 39975 0 PAP
+mgh028.dat 212 20/mmHg 12 0 -1023 3859 0 CVP
+mgh028.dat 212 1000 12 0 -687 9161 0 Resp. Imp.
+mgh028.dat 212 1000 12 0 -1375 13158 0 CO2
+#<age>: 49 <sex>: F <diagnoses>: Unstable post-infarction angina
+# PERTINENT HISTORY:
+#   Mitral regurgitation
+# GENERAL COMMENTS:
+#   Recording of PA and PCW during V pacing @ 0-4 min
+#   Stop/FFW @ 4 min - 5 min
+#   Record @ 5 min - 6 min
+#   Stop/FFW @ 6 min - 7 min
+#   Chest pain resolving @ 0 - 7 min
+#   Set-up sequence @ 45 min - 52 min
+# ELECTROCARDIOGRAPHIC DATA:
+# UNDERLYING RHYTHM:
+#   Ventricular pacing @ 70 bpm
+# RHYTHM DISTURBANCES:
+#   First degree heart block
+#   Transient acceleration of underlying sinus rhythm with RBBB near end of recording
+# PACEMAKER DATA:
+#   Permanent ventricular demand pacemaker (WI)
+#   Medtronic 8423 pulse generator
+#   Pulse width .496 msec
+#   Sensitivity 2.5 mv
+#   Refractory period 324 msec
+# ECG INTERPRETATION:
+#   Antero-septal infarct
+#   Inferior infarct
+#   Left anterior hemiblock
+#   Left axis deviation
+# TECHNICAL COMMENTS:
+#   Pace channel on @ 23 min
+#   ECG cal after 52 min
+#   Frequent movement artifact
+# HEMODYNAMIC DATA:
+#   ART: 92/60
+#   PAP: 44/22   	PCW: 20 (@ 359 min)
+# WAVEFORM PATTERNS:
+#   The pulmonary arterial channel illustrates the following configurations in sequence @ 0-4 min:
+#   1) PCW cannon waves due to A-V asynchrony,
+#   2) slight normalization of cannon waves (when P preceds QRS), with evidence of V waves in PCW due to mitral regurgitation,
+#   3) cannon waves,
+#   4) V waves during NSR, and
+#   5) pulmonary arterial configuration.
+#   The arterial trace exhibits minor changes in configuration during normal sinus rhythm when atrio-ventricular synchrony is restored.
+# RESPIRATORY DATA:
+# RATE:   20 bpm
+# MODE OF VENTILATION:
+#   Spontaneous

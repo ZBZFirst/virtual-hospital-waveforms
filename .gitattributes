@@ -1,0 +1,4 @@
+mgh/** binary
+site/**/*.glb binary
+site/**/*.bin binary
+site/**/*.gz binary

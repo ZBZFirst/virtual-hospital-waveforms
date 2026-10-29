@@ -1,0 +1,45 @@
+mgh021 8 360/0.476 1166400 16:47:00 31/05/1991
+mgh021.dat 212 288(-287)/mV 12 0 -340 53095 0 ECG lead I
+mgh021.dat 212 240(-80)/mV 12 0 -25 17726 0 ECG lead II
+mgh021.dat 212 224(-14)/mV 12 0 -61 47853 0 ECG lead V
+mgh021.dat 212 16.7(-1431)/mmHg 12 0 -25 23760 0 ART
+mgh021.dat 212 34.34(-1643)/mmHg 12 0 -1063 46565 0 PAP
+mgh021.dat 212 19.8(-1181)/mmHg 12 0 -1052 43543 0 CVP
+mgh021.dat 212 1000 12 0 -65 4256 0 Resp. Imp.
+mgh021.dat 212 1000 12 0 908 3418 0 CO2
+#<age>: 75 <sex>: M <diagnoses>: Upper GI bleeding
+# PERTINENT HISTORY:
+#   Coronary disease
+#   Peripheral vascular disease
+# PHARMACOLOGIC SUPPORT:
+#   Pitressin @ 12 mcg/min
+#   TNG @ 30 mcg/min, then 100 mcg/min
+#   Dopamine @ 320 mcg/min (then OFF @ 31 min)
+# GENERAL COMMENTS:
+#   Recording ends @ 44 min with final annotation sequence
+#   Re-started @ 44 min - 51 min
+# ELECTROCARDIOGRAPHIC DATA:
+# UNDERLYING RHYTHM:
+#   Normal sinus rhythm @ 92 bpm
+# RHYTHM DISTURBANCES:
+#   Atrial ectopy with bigeminal pattern
+#   Supraventricular tachycardia
+#   Multifocal ventricular ectopy, occasional fusion beats
+# ECG INTERPRETATION:
+#   Question acute anterior subendocardial injury and possibly evolving infarction
+# TECHNICAL COMMENTS:
+#   Wandering baseline
+#   Carotid sinus massage @ 31 min
+# HEMODYNAMIC DATA:
+#   ART: 100/75   	MEAN: 85
+#   (femoral)
+#   PAP: 34/24
+#   RAP: 16   	CO: 3.2
+# WAVEFORM PATTERNS:
+#   Fluctuations in arterial pressure
+#   Respiratory variation
+# RESPIRATORY DATA:
+# RATE:   10/10 bpm
+# MODE OF VENTILATION:
+#   Controlled
+# CO2 RECORDING

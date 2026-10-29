@@ -1,0 +1,43 @@
+mgh010 8 360/0.476 1872872
+mgh010.dat 212 1185(0)/mV 12 0 -784 26750 0 ECG lead I
+mgh010.dat 212 1185(0)/mV 12 0 -814 36874 0 ECG lead II
+mgh010.dat 212 1185(0)/mV 12 0 -756 10947 0 ECG lead V
+mgh010.dat 212 13.16(-1515)/mmHg 12 0 -1400 43431 0 ART
+mgh010.dat 212 20.54(-996)/mmHg 12 0 -1376 42413 0 PAP
+mgh010.dat 212 20.18(-1000)/mmHg 12 0 -1236 1574 0 CVP
+mgh010.dat 212 1000 12 0 -700 33588 0 Resp. Imp.
+mgh010.dat 212 1000 12 0 -85 39699 0 CO2
+#<age>: 56 <sex>: F <diagnoses>: Mitral regurgitation; Prosthetic mitral valve endocarditis; Pneumonia
+# PERTINENT HISTORY:
+#   sip mitral valve replacement (porcine)
+# PHARMACOLOGIC SUPPORT:
+#   Initial rates: Nipride @ 125 mcg/mln; Dobutamine @ 686 mcg/min
+#   Adjusted rates: Nipride to 50 mcg/min; Dopamine @ 150 mcg/min;
+#   Dobutamine unchanged
+# ELECTROCARDIOGRAPHIC DATA:
+# UNDERLYING RHYTHM:
+#   Sinus tachycardia with first degree heart block @ 120 bpm
+# RHYTHM DISTURBANCES:
+#   Multifocal ventricular ectopy
+#   Occasional couplets
+#   Short runs of ventricular tachycardia
+#   Changing P-R ? Wenckebach pattern
+# ECG INTERPRETATION:
+#   Non-specific STT wave changes
+#   Probable right ventricular hypertrophy
+# HEMODYNAMIC DATA:
+#   ART: 98/60
+#   PAP: 80/35   	PCW: 36 (V wave = 42) (@ 30 min, 42 min, 47 min, 61 min, 61 min)
+#   RAP: 16
+# WAVEFORM PATTERNS:
+#   Intermittent "V waves" in pulmonary capillary wedge tracing
+#   Unusual CVP trace due to heart block
+#   Intermittent cannon waves
+#   Pulmonary hypertension
+#   Respiratory variation
+# TECHNICAL COMMENTS:
+#   CVP off @ 57 min
+# RESPIRATORY DATA:
+# RATE:   17 bpm
+# MODE OF VENTILATION:
+#   Spontaneous

@@ -1,0 +1,42 @@
+mgh013 8 360/0.476 1872720 10:21:55 25/06/1991
+mgh013.dat 212 491(-351)/mV 12 0 -357 2561 0 ECG lead I
+mgh013.dat 212 415(-137)/mV 12 0 -19 52024 0 ECG lead II
+mgh013.dat 212 394(-168)/mV 12 0 -29 51170 0 ECG lead V
+mgh013.dat 212 13.24(-1150)/mmHg 12 0 -15 24072 0 ART
+mgh013.dat 212 18.82(-1381)/mmHg 12 0 -1040 27033 0 PAP
+mgh013.dat 212 19.74(-1289)/mmHg 12 0 -1039 284 0 CVP
+mgh013.dat 212 1000 12 0 -25 52741 0 Resp. Imp.
+mgh013.dat 212 1000 12 0 981 63670 0 CO2
+#<age>: 73 <sex>: M <diagnoses>: Angioplasty of right external iliac artery
+# PATIENT HISTORY:
+#   Coronary disease (unstable angina)
+#   Cerebral vascular disease
+#   Smoking
+# PHARMACOLOGIC SUPPORT:
+#   TNG @ 30 mcg/min
+# GENERAL COMMENTS:
+#   Recording in vascular angiography suite
+#   Movement artifact due to patient re-positioning and agitation
+# ELECTROCARDIOGRAPHIC DATA:
+# UNDERLYING RHYTHM:
+#   Atrial fibrillation with incomplete left bundle branch block @ 78 bpm
+# RHYTHM CHANGES:
+#   Ventricular ectopy
+# ECG INTERPRETATION:
+#   Nonspecific ST segment and T wave abnormalities consistent with digitalis effect
+# TECHNICAL COMMENTS:
+#   Chest lead = V6 (re-positioned for angiography)
+# HEMODYNAMIC DATA:
+#   ART: 140/60   	MEAN: 87
+#   PAP: 56/32
+#   RAP: 10   	CO:5
+# WAVEFORM PATTERNS:
+#   Pulmonary artery catheter migrates into right ventricle @ 66 min
+#   Catheter re-positioned until end of trace
+#   Pulmonary hypertension
+# TECHNICAL COMMENTS:
+#   No initial cal and pop-tests
+# RESPIRATORY DATA:
+# RATE:   20 bpm
+# MODE OF VENTILATION:
+#   Spontaneous

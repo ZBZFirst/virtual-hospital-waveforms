@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>ZeBeZo Hospital Campus | Full Catalog Stage</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #101b22; color: #e6f1f5; font: 14px system-ui, sans-serif; }
+    #view { position: fixed; inset: 0; }
+    #bar { position: fixed; z-index: 2; top: 14px; left: 14px; right: 14px; max-width: 1200px; padding: 9px 11px; border: 1px solid #52707c; border-radius: 10px; background: #132731e8; display: flex; align-items: center; flex-wrap: wrap; gap: 7px; box-shadow: 0 6px 28px #0007; }
+    #bar strong { margin-right: 8px; }
+    #toggleControls { display: none; }
+    button { color: #ecf9fc; background: #244450; border: 1px solid #5a8997; border-radius: 5px; padding: 7px 10px; cursor: pointer; }
+    button:hover, button.active { background: #23768b; }
+    #status { color: #afcdd4; font-size: 12px; flex-basis: 100%; }
+    #tourTime { min-width: 78px; font-variant-numeric: tabular-nums; color: #bfe3e9; }
+    #tourScrub { width: 150px; accent-color: #43b3c9; }
+    #help { position: fixed; left: 16px; bottom: 14px; z-index: 2; background: #132731d9; padding: 7px 10px; border-radius: 5px; color: #c5e3e9; }
+    #error { position: fixed; right: 16px; bottom: 14px; z-index: 3; max-width: 460px; background: #5d2029; padding: 10px; display: none; }
+    #cubeHint { position: fixed; z-index: 4; display: none; pointer-events: none; color: #e5f8fb; background: #0b2730ed; border: 1px solid #5caabc; border-radius: 5px; padding: 5px 8px; font-size: 12px; }
+    #telemetryDetail { position: fixed; inset: 4vh 4vw; z-index: 8; display: none; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid #52707c; border-radius: 10px; background: #10242af5; box-shadow: 0 10px 50px #000a; }
+    #telemetryDetail.open { display: flex; }
+    #telemetryDetail header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    #telemetryDetail canvas { width: 100%; min-height: 0; flex: 1; object-fit: contain; background: #08191f; }
+    #telemetryDetail small { color: #afcdd4; }
+    @media(max-width:650px) { #bar { top: 6px; left: 6px; right: 6px; gap: 5px; padding: 8px; max-height: 32vh; overflow: auto; } button { padding: 6px; } #help { font-size: 11px; } }
+    html.embedded #bar { top: 160px; max-width: 780px; max-height: 26vh; overflow: auto; }
+    html.embedded #telemetryDetail { top: 140px; }
+    html.embedded #help { bottom: 94px; }
+    @media(max-width:650px) { html.embedded #bar { top: 155px; max-height: 46vh; } html.embedded #telemetryDetail { top: 165px; } html.embedded #toggleControls { display: inline-block; margin-left: auto; } html.embedded body.controls-collapsed #bar > :not(strong):not(#toggleControls):not(#status) { display: none; } html.embedded body.controls-collapsed #bar { max-height: 100px; } }
+  </style>
+  <script type="importmap">
+  {"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/jsm/"}}
+  </script>
+</head>
+<body>
+  <div id="view"></div>
+  <div id="bar">
+    <strong>ZeBeZo hospital campus</strong>
+    <button id="toggleControls" aria-expanded="false" aria-controls="bar">Controls ▾</button>
+    <span>Hospital:</span>
+    <button data-hospital="A">A</button><button data-hospital="B">B</button><button data-hospital="C">C</button><button data-hospital="D">D</button><button data-hospital="E">E</button>
+    <span>Elevator:</span>
+    <button data-floor="1">Floor 1</button><button data-floor="2">Floor 2</button><button data-floor="3">Floor 3</button><button data-floor="4">Floor 4</button><button data-floor="5">Floor 5</button><button data-floor="6">Floor 6</button>
+    <span>Room:</span>
+    <button data-room="1">1</button><button data-room="2">2</button><button data-room="3">3</button><button data-room="4">4</button><button data-room="5">5</button><button data-room="6">6</button>
+    <button id="overview">Floor view</button>
+    <button id="hospitalView" aria-pressed="false">Hospital view</button>
+    <button id="roof" aria-pressed="false">Show roof</button>
+    <button id="walk" aria-pressed="false">Walk mode</button>
+    <button id="tablet" aria-pressed="false">Equip tablet</button>
+    <button id="previousPatient" aria-label="Previous patient">◀ Patient</button>
+    <button id="nextPatient" aria-label="Next patient">Patient ▶</button>
+    <button id="inspectTablet" aria-pressed="false" disabled>Inspect tablet</button>
+    <button id="grandMonitor">Nursing cube</button>
+    <button id="openFeed" disabled>Choose a room</button>
+    <button id="cubeAuto" aria-pressed="true">Pause rotation</button>
+    <button id="elevatorDoor" aria-pressed="false">Open elevator</button>
+    <button id="tourPlay">Play unit walk</button>
+    <input id="tourScrub" aria-label="Unit walking tour position" type="range" min="0" max="1" value="0">
+    <span id="tourTime">0:00 / 0:00</span>
+    <span id="status">Loading scene…</span>
+  </div>
+  <div id="help">Drag to orbit · wheel to zoom · right drag to pan · select a floor and room above</div>
+  <div id="error"></div>
+  <div id="cubeHint"></div>
+  <section id="telemetryDetail" role="dialog" aria-modal="true" aria-label="PhysioNet telemetry detail">
+    <header><strong id="telemetryTitle">PhysioNet telemetry</strong><button id="closeTelemetry">Close</button></header>
+    <canvas id="telemetryCanvas" width="1200" height="720"></canvas>
+    <small>Full PhysioNet MGH/MF source recording. Channels are shown only when present in the source. <a href="https://physionet.org/content/mghdb/1.0.0/" target="_blank" rel="noopener" style="color:#9bdae9">Source and attribution</a></small>
+  </section>
+  <script type="module" src="./viewer.js"></script>
+</body>
+</html>

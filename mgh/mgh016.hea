@@ -1,0 +1,36 @@
+mgh016 8 360/0.476 1452179
+mgh016.dat 212 750(0)/mV 12 0 -522 48578 0 ECG lead I
+mgh016.dat 212 750(0)/mV 12 0 -115 37527 0 ECG lead II
+mgh016.dat 212 750(0)/mV 12 0 -1314 27679 0 ECG lead V
+mgh016.dat 212 12.32(-1227)/mmHg 12 0 -1483 64871 0 ART
+mgh016.dat 212 20.96(-1037)/mmHg 12 0 -1143 32078 0 PAP
+mgh016.dat 212 20.9(-1012)/mmHg 12 0 -1269 51567 0 CVP
+mgh016.dat 212 1000 12 0 -672 9456 0 Resp. Imp.
+mgh016.dat 212 1000 12 0 -1320 20646 0 CO2
+#<age>: 82 <sex>: M <diagnoses>: Abdominal aortic aneurysm resection and grafting
+# PERTINENT HISTORY:
+#   Coronary disease (MI, angina)
+#   Carotid disease
+#   Smoking
+# PHARMACOLOGIC SUPPORT:
+#   TNG @ 60 mcg/min
+# ELECTROCARDIOGRAPHIC DATA:
+# UNDERLYING RHYTHM:
+#   1: 1 ventricular pacing @ 50 bpm for tachy-brady syndrome
+# PACEMAKER DATA:
+#   Permanent ventricular demand pacer
+#   Specifics unavailable
+# ECG INTERPRETATION:
+#   Non-specific STT wave changes
+#   ? Old infarct
+# HEMODYNAMIC DATA:
+#   ART: 150/70   	MEAN: 83
+#   PAP: 20/8   	PCW: 6 (@ 11 min, 15 min, 41 min, 44 min)
+#   RAP: 3   	CO: 3.5
+# WAVEFORM PATTERNS:
+#   Respiratory variation
+# RESPIRATORY DATA:
+# RATE:   2/18 bpm
+# MODE OF VENTILATION:
+#   Intermittent mandatory ventilation
+# CO2 RECORDING

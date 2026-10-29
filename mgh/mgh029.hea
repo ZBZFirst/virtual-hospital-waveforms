@@ -1,0 +1,47 @@
+mgh029 8 360/0.476 1751777
+mgh029.dat 212 761(-106)/mV 12 0 -785 11026 0 ECG lead I
+mgh029.dat 212 809(-110)/mV 12 0 -781 19952 0 ECG lead II
+mgh029.dat 212 573(4)/mV 12 0 -687 59958 0 ECG lead V
+mgh029.dat 212 12.2(-1228)/mmHg 12 0 -1470 48992 0 ART
+mgh029.dat 212 20.08(-1028)/mmHg 12 0 -1297 45561 0 PAP
+mgh029.dat 212 20.06(-1009)/mmHg 12 0 -1377 59801 0 CVP
+mgh029.dat 212 1000 12 0 -702 51965 0 Resp. Imp.
+mgh029.dat 212 1000 12 0 -1369 37716 0 CO2
+#<age>: 84 <sex>: M <diagnoses>: Resection and grafting of abdominal aortic aneurysm
+# PERTINENT HISTORY:
+#   Coronary disease
+#   COPD
+# PHARMACOLOGIC SUPPORT:
+#   Dopamine @ 800 mcg/min,then 200 mcg/min, then 800 mcg/min
+#   Levophed @ 2 mcg/min, then 3 mcg/min, then 2 mcg/min, then 10 mcg/min
+#   Accidental Levophed bolus near end of tape
+# GENERAL COMMENTS:
+#   Suctioning @ 35 min - 40 min
+# ELECTROCARDIOGRAPHIC DATA:
+# UNDERLYING RHYTHM:
+#   Sinus tachycardia @ 100 bpm
+# RHYTHM DISTURBANCES:
+#   Atrial ectopy
+#   Unifocal ventricular ectopy
+#   Run of supraventricular tachycardia @ 61 min
+# ECG INTERPRETATION:
+#   Evolving anterior infarct
+# TECHNICAL COMMENTS:
+#   LL electrode off @ 41 min - 43 min
+# HEMODYNAMIC DATA:
+#   ART: 120/60   	MEAN: 85
+#   PAP: 44/24   	PCW: 20 (@ 8 min, 56 min, 57 min, 60 min)
+#   RAP: 18
+# WAVEFORM PATTERNS:
+#   Arterial hypotension near end of tape is followed by acute hypertension culminating in pulsus alternans.
+#    The course of pulmonary hypertension parallels that of systemic arterial hypertension.
+#    "Catheter whip" is pronounced in the pulmonary arterial tracing.
+# TECHNICAL COMMENTS:
+# Poor frequency response CVP (12.5 Hz)
+# Borderline frequency response PAP (16.5 H2z
+# RESPIRATORY DATA:
+# RATE:   10 bpm
+# MODE OF VENTILATION:
+#   Controlled
+# CO2 RECORDING:
+#   On @ 11 min, off @ 50 min

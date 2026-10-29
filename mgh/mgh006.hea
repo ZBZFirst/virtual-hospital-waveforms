@@ -1,0 +1,40 @@
+mgh006 8 360/0.476 1626197
+mgh006.dat 212 1185(-48)/mV 12 0 -645 42598 0 ECG lead I
+mgh006.dat 212 1185(50)/mV 12 0 -854 2014 0 ECG lead II
+mgh006.dat 212 1185(102)/mV 12 0 -868 56214 0 ECG lead V
+mgh006.dat 212 11.91(-1227)/mmHg 12 0 -1528 59788 0 ART
+mgh006.dat 212 20.26(-991)/mmHg 12 0 -1349 64864 0 PAP
+mgh006.dat 212 20.06(-1007)/mmHg 12 0 -1431 12606 0 CVP
+mgh006.dat 212 1000 12 0 -985 37349 0 Resp. Imp.
+mgh006.dat 212 1000 12 0 182 60721 0 CO2
+#<age>: 72 <sex>: M <diagnoses>: Endocarditis; Sepsis
+# PHARMACOLOGIC SUPPORT:
+#   Dopamine @ 950 mcg/min
+# ELECTROCARDIOGRAPHIC DATA:
+# UNDERLYING RHYTHM:
+#   Ventricular pacing @ 100 bpm for sinus rhythm with A-V dissociation
+# PACEMAKER INFORMATION:
+#   Temporary ventricular fixed rate pacing (VOO)
+#   Transvenous wires (USCI bipolar #4)
+#   Medtronic generator (output 5 mv)
+#   Non-functional permanent coplin lithium pacer
+# TECHNICAL COMMENTS:
+#   Pacer mode (CH2) activated @ 22 min
+#   Persistent ECG interference
+# HEMODYNAMIC DATA:
+#   ART: 120/50   	MEAN: 72
+#   PAP: 47/20   	PCW: 17(@ 20 min, 32 min, 39 min)
+#   RAP: 11
+# WAVEFORM PATTERNS:
+#   Intermittent cannon waves in CVP and PCW due to A-V asynchrony
+# TECHNICAL COMMENTS:
+#   CVP transduced with medications infusing simultaneously via pump
+#   CVP on without medications @ 9 min - 11 min
+#   Simultaneous CVP and PCW recording @ 20 min
+# RESPIRATORY DATA:
+# RATE:   8/22 bpm
+# MODE OF VENTILATION:
+#   Intermittent mandatory ventilation
+# CO2 RECORDING:
+#   Datex sidestream sensor
+#   CO2 monitor malfunction @ 36 min, turned off

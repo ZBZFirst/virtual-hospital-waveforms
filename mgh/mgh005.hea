@@ -1,0 +1,33 @@
+mgh005 8 360/0.476 1706927
+mgh005.dat 212 1267(-87)/mV 12 0 -727 27995 0 ECG lead I
+mgh005.dat 212 1254(-462)/mV 12 0 -967 62424 0 ECG lead II
+mgh005.dat 212 1057(-70)/mV 12 0 -834 53834 0 ECG lead V
+mgh005.dat 212 11.72(-1229)/mmHg 12 0 -1423 28509 0 ART
+mgh005.dat 212 20.02(-1020)/mmHg 12 0 -1279 29743 0 PAP
+mgh005.dat 212 19.56(-1033)/mmHg 12 0 -1141 2954 0 CVP
+mgh005.dat 212 1000 12 0 -837 31326 0 Resp. Imp.
+mgh005.dat 212 1000 12 0 -79 60930 0 CO2
+#<age>: 56 <sex>: M <diagnoses>: Aortobifemoral graft; GI bleed; Exploratory laporotomy; Sepsis
+# PHARMACOLOGIC SUPPORT:
+#   Dopamine @ 213 mcg/min
+# ELECTROCARDIOGRAPHIC DATA:
+# UNDERLYING RHYTHM:
+#   Sinus tachycardia @ 100 bpm
+# ECG INTERPRETATION:
+#   Old antero-lateral infarct
+#   Anterior ST segment elevation consistent with aneurysm
+# HEMODYNAMIC DATA:
+#   ART: 120/60   	MEAN: 90
+#   PAP: 28/20   	PCW: 14 (@ 26 min, 31 min, 42 min, 58 min)
+#   RAP: 12   	CO: 9.2
+# WAVEFORM PATTERNS:
+#   Respiratory variation
+# TECHNICAL COMMENTS:
+#   ART pop-test unusual; tracing damped during recording
+#   Transducer dome noted to be defective at end of case
+# RESPIRATORY DATA:
+# RATE:   12 bpm
+# MODE OF VENTILATION:
+#   Controlled
+# CO2 RECORDING:
+#   Sidestream sensor with Datex unit on @ 55 min

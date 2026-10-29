@@ -1,0 +1,32 @@
+.grid-monitor[hidden] { display: none; }
+.grid-monitor { position: fixed; inset: 0; z-index: 40; pointer-events: none; color: #e7f4f7; font-family: system-ui,sans-serif; }
+.grid-toolbar { position: absolute; top: 10px; left: 22px; right: 22px; z-index: 1000; height: 45px; display: flex; align-items: center; gap: 12px; padding: 5px 12px; border: 1px solid #547c8a; border-radius: 8px; background: #0d2536ec; pointer-events: auto; }
+.grid-toolbar strong { font-size: 16px; }
+.grid-count { margin-right: auto; color: #b2ccd4; font-size: 12px; }
+.grid-toolbar button,.grid-room button { font: inherit; color: #e7f4f7; background: #1b4054; border: 1px solid #608797; border-radius: 6px; padding: 5px 9px; cursor: pointer; }
+.grid-toolbar button:hover,.grid-room button:hover { background: #286078; }
+.grid-room { position: absolute; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; border: 2px solid #5bcbd4; border-radius: 10px; background: #0d2230; box-shadow: 0 14px 50px #000c; pointer-events: auto; }
+.grid-room-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 49px; padding: 5px 10px; border-bottom: 1px solid #385a68; background: #15374a; cursor: grab; touch-action: none; user-select: none; }
+.grid-room-header:active { cursor: grabbing; }
+.grid-room-heading { min-width: 0; display: flex; align-items: baseline; gap: 10px; }
+.grid-room-heading strong { flex: none; font-size: 15px; }
+.grid-room-heading small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #a8c5ce; font-size: 11px; }
+.grid-room-actions { flex: none; display: flex; gap: 7px; }
+.grid-room-actions button { font-size: 12px; }
+.grid-room-actions button:last-child { width: 31px; padding: 3px; font-size: 21px; line-height: 1; }
+.grid-room-status { min-height: 22px; padding: 4px 11px; color: #b6d0d6; font-size: 11px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.grid-room-charts { min-height: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 2px 10px 6px; }
+.grid-trace { min-height: 0; flex: 1; display: flex; flex-direction: column; border: 1px solid #274858; border-radius: 4px; overflow: hidden; }
+.grid-trace-label { flex: none; display: flex; justify-content: space-between; padding: 2px 7px; font-size: 11px; }
+.grid-trace-label output { margin-left: auto; padding-right: 7px; font-variant-numeric: tabular-nums; }
+.grid-axis-controls { display: flex; gap: 2px; align-items: center; }
+.grid-room .grid-axis-controls button { min-width: 24px; height: 17px; padding: 0 3px; border-radius: 3px; font-size: 10px; line-height: 1; }
+.grid-trace:nth-child(1) .grid-trace-label { color: #72e1e4; }
+.grid-trace:nth-child(2) .grid-trace-label { color: #ffd092; }
+.grid-trace:nth-child(3) .grid-trace-label { color: #c8bafc; }
+.grid-trace canvas { display: block; width: 100%; height: 100%; min-height: 0; }
+.grid-room-controls { min-height: 38px; display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-top: 1px solid #385a68; }
+.grid-room-controls button { flex: none; font-size: 12px; }
+.grid-room-controls input { flex: 1; min-width: 40px; }
+.grid-room-controls output { flex: none; min-width: 102px; text-align: right; color: #bfd2d8; font-size: 11px; font-variant-numeric: tabular-nums; }
+.grid-room button:focus-visible,.grid-toolbar button:focus-visible,.grid-room input:focus-visible { outline: 2px solid #fff4bd; outline-offset: 2px; }

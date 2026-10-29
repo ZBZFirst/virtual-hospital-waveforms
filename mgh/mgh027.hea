@@ -1,0 +1,36 @@
+mgh027 8 360/0.476 1401947
+mgh027.dat 212 716(33)/mV 12 0 -742 41294 0 ECG lead I
+mgh027.dat 212 715(34)/mV 12 0 -762 47512 0 ECG lead II
+mgh027.dat 212 612(-3)/mV 12 0 -743 45795 0 ECG lead V
+mgh027.dat 212 11.97(-1230)/mmHg 12 0 -1464 42900 0 ART
+mgh027.dat 212 20.36(-1031)/mmHg 12 0 -1332 17391 0 PAP
+mgh027.dat 212 20.36(-1026)/mmHg 12 0 -1361 55259 0 CVP
+mgh027.dat 212 1000 12 0 -756 9514 0 Resp. Imp.
+mgh027.dat 212 1000 12 0 -1381 19065 0 CO2
+#<age>: 73 <sex>: M <diagnoses>: Carotid endartarectomy
+# PERTINENT HISTORY:
+#   Diffuse coronary disease
+#   Cardiomyopathy
+#   COPD
+# GENERAL COMMENTS:
+#   Movement artifact throughout
+#   Extreme artifact @ 10 min - 12 min
+#   Asleep @ 25 min - 37 min
+# ELECTROCARDIOGRAPHIC DATA:
+# UNDERLYING RHYTHM:
+#   Atrial fibrillation @ 88 bpm
+# ECG INTERPRETATION:
+#   Diffuse transmural infarct
+#   Inferior wall ischemia
+#   Non-specific sn wave changes
+#   Left ventricular hypertrophy
+# HEMODYNAMIC DATA:
+#   ART: 140/60 	MEAN: 72
+#   PAP: 46/20
+#   RAP: 14
+# WAVEFORM PATTERNS:
+#   Respiratory variation
+# RESPIRATORY DATA:
+# RATE:   18 bpm
+# MODE OF VENTILATION:
+#   Spontaneous

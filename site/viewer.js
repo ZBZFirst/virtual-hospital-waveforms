@@ -1,0 +1,1760 @@
+const $ = (id) => document.getElementById(id);
+const RATE = 50;
+const DEFAULT_WINDOW_SECONDS = 30;
+let breathSequenceMap=null;
+let fullCatalogByRecording=new Map();
+const LAYOUT_KEY = 'zebezo-hospital-layout-v3';
+const LEGACY_LAYOUT_KEYS = ['zebezo-hospital-layout-v2','zebezo-hospital-layout-v1'];
+const ATLAS_SIGNAL_STRIDE = 5;
+const LOCAL_ROOM_PREVIEW = location.port === '8766';
+const RECORDING_BASE = LOCAL_ROOM_PREVIEW ? new URL('/recordings/', location.href).href :
+  "https://raw.githubusercontent.com/ZBZFirst/file/32063407e7fffb75d3866d080078d80295de476c/WaveformBackups/";
+const els = {
+  atlas: $('atlas'), atlasStatus: $('atlasStatus'), sessionClock: $('sessionClock'),
+  activityStatus: $('activityStatus'), flowDirection: $('flowDirection'), muteAll: $('muteAll'),
+  segmentProgressBar: $('segmentProgressBar'), segmentProgressText: $('segmentProgressText'),
+  segmentFailures: $('segmentFailures'), segmentFailureList: $('segmentFailureList'), retrySegments: $('retrySegments'),
+  hospitalScene: $('hospitalScene'), sceneLoading: $('sceneLoading'), sceneLoadingTitle: $('sceneLoadingTitle'),
+  sceneLoadingMessage: $('sceneLoadingMessage'), retryScene: $('retryScene'),
+  mobileMenu: $('mobileMenu'), mobileMenuToggle: $('mobileMenuToggle'), mobileMenuClose: $('mobileMenuClose'),
+  mobileMenuBackdrop: $('mobileMenuBackdrop'),
+  speaker: $('speakerBtn'), midiReadout: $('midiReadout'), list: $('recordingList'), listCount: $('listCount'),
+  search: $('search'), datasetStats: $('datasetStats'), streamLabel: $('streamLabel'),
+  streamTitle: $('streamTitle'), streamMeta: $('streamMeta'), loadStatus: $('loadStatus'),
+  start: $('startBtn'), play: $('playBtn'), pause: $('pauseBtn'), stop: $('stopBtn'),
+  speed: $('speed'), window: $('window'), scrub: $('scrub'), time: $('timeReadout'),
+  flowValue: $('flowValue'), pressureValue: $('pressureValue'), volumeValue: $('volumeValue'),
+  flowBreathValue: $('flowBreathValue'), pressureBreathValue: $('pressureBreathValue'),
+  breathValue: $('breathValue'), volumeToggle: $('volumeToggle'), pathAxis: $('pathAxis'),
+  overview: $('overview'), flow: $('flowChart'), pressure: $('pressureChart'),
+  volume: $('volumeChart'), volumeCard: $('volumeCard'), path: $('wave3d'), pathLabel: $('pathLabel'),
+  database: $('databasePanel'), waveform: $('waveformPanel'), breadcrumbs: $('breadcrumbs'),
+  detailOverlay: $('detailOverlay'), directoryOverlay: $('directoryOverlay')
+};
+const state = {
+  entries: [], units: new Map(), nodes: [], corridors: [], layout: null,
+  projected: [], selectedNode: null, selected: null, data: null,
+  active: false, position: 0, lastFrame: 0, lastDraw: 0, pending: null,
+  atlasCenter: {x:0,y:0}, atlasZoom: 1, atlasDrag: null, atlasPointers: new Map(),
+  atlasPinch: null, atlasLastDraw: 0, clockLastDraw: 0, sessionStart: performance.now(),
+  signals: null, hover: null, reverseFlow: false, audio: null, voices: new Map(),
+  pathYaw: .7, pathPitch: -.32, pathDrag: null, cache: new Map(), filter: '', unitPlayback: null,
+  model: null, organization: null, proposal: null, layoutIssues: [], hospitalView: null,
+  floorLevel: null, buildingFaces: 'south-east', bedManagerView: false, managerHospitalId: null,
+  segmentStore: null, segmentReady: null, seekTimer: null, seekGeneration: 0,
+  roomMode: 'review', reviewWasPlaying: false
+};
+const feedStarts=new Map();
+const completedFeeds=new Set();
+function feedElapsed(entry,at=sessionSeconds()){
+  if(completedFeeds.has(entry.name))return entry.samples/RATE;
+  return Math.min(entry.samples/RATE,Math.max(0,at-(feedStarts.get(entry.name)??0)));
+}
+function feedEnded(entry){return feedElapsed(entry)>=entry.samples/RATE;}
+function advanceFeed(entry,seconds){
+  if(seconds>=entry.samples/RATE)completedFeeds.add(entry.name);
+  else feedStarts.set(entry.name,sessionSeconds()-Math.max(0,seconds));
+}
+function replayFeed(entry){completedFeeds.delete(entry.name);feedStarts.set(entry.name,sessionSeconds());drawAtlas();}
+let roomAxes={flow:WaveformAxis.create(),pressure:WaveformAxis.create(),volume:WaveformAxis.create()};
+window.RoomChartAxes={get:key=>roomAxes[key]};
+function mountRoomAxisControls(){
+  for(const [id,key,label] of [['flowChart','flow','Flow'],['pressureChart','pressure','Airway pressure'],['volumeChart','volume','Calculated volume']]){
+    const heading=$(id).closest('.signal-card').querySelector('.chart-head');
+    const controls=document.createElement('div');controls.className='chart-axis-controls';
+    for(const [action,symbol,title] of [['zoomOut','Y−','Zoom out'],['zoomIn','Y+','Zoom in'],['reset','Y↺','Reset axis to visible values']]){
+      const button=document.createElement('button');button.type='button';button.textContent=symbol;
+      button.title=`${title} · ${label} Y axis`;
+      button.setAttribute('aria-label',`${title} for ${label} Y axis`);
+      button.addEventListener('click',()=>{
+        if(!WaveformAxis[action](roomAxes[key]))return;
+        if(state.roomMode==='live')window.RoomLive.draw();else drawAll();
+      });
+      controls.append(button);
+    }
+    heading.append(controls);
+  }
+}
+
+let unitCubes;
+let audioViewGeneration=0;
+
+function clock(seconds) {
+  const h = Math.floor(seconds / 3600), m = Math.floor(seconds % 3600 / 60), s = (seconds % 60).toFixed(2).padStart(5, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
+}
+function sessionSeconds(){return (performance.now()-state.sessionStart)/1000;}
+function compactAtlas(){return matchMedia('(max-width: 700px), (max-height: 520px)').matches;}
+function defaultAtlasZoom(){return compactAtlas()?2.5:1;}
+function signalAt(entry, seconds){
+  if(!state.signals)return null;
+  const duration=entry.samples/RATE;
+  if(seconds<0||seconds>=duration)return null;
+  const sample=seconds*RATE/ATLAS_SIGNAL_STRIDE;
+  const current=Math.min(entry.signalBins-1,Math.floor(sample));
+  const next=Math.min(entry.signalBins-1,current+1),blend=sample-current;
+  const offset=entry.signalOffset;
+  const flowA=state.signals[offset+current*2],flowB=state.signals[offset+next*2];
+  const pressureA=state.signals[offset+current*2+1],pressureB=state.signals[offset+next*2+1];
+  if(flowA===255||flowB===255||pressureA===255||pressureB===255)return null;
+  return {flow:((flowA+(flowB-flowA)*blend)-127)*60/127,
+    pressure:(pressureA+(pressureB-pressureA)*blend)/5};
+}
+function feedClock(entry){
+  if(!els.detailOverlay.hidden&&state.selected===entry&&state.roomMode==='live')return window.RoomLive.elapsed();
+  if(!els.detailOverlay.hidden&&state.selected===entry&&state.data)return state.position/RATE;
+  if(!els.detailOverlay.hidden && state.unitPlayback?.members.includes(entry))return feedElapsed(entry,state.unitPlayback.elapsed);
+  return feedElapsed(entry);
+}
+function feedPaused(entry){
+  if(!els.detailOverlay.hidden&&state.selected===entry&&state.roomMode==='live')return !window.RoomLive.isRunning();
+  if(!els.detailOverlay.hidden&&state.selected===entry&&state.data)return !state.active;
+  if(!els.detailOverlay.hidden && state.unitPlayback?.members.includes(entry))return !state.unitPlayback.active;
+  return false;
+}
+async function loadAtlasSignals(){
+  try{
+    if(!('DecompressionStream' in window))throw new Error('This browser cannot unpack the atlas signal track');
+    const response=await fetch('atlas_signals.bin.gz');
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    const bytes=new Uint8Array(await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+    let offset=0;
+    for(const entry of state.entries){
+      entry.signalOffset=offset;
+      entry.signalBins=Math.ceil(entry.samples/ATLAS_SIGNAL_STRIDE);
+      offset+=entry.signalBins*2;
+    }
+    if(bytes.length!==offset)throw new Error('Signal track length does not match the manifest');
+    state.signals=bytes;
+    els.activityStatus.textContent='Waveform signal track ready';
+    updateSpeaker();
+    drawAtlas();refreshHospitalStatuses();
+  }catch(error){
+    els.activityStatus.textContent=`Atlas signals unavailable: ${error.message}`;
+  }
+}
+function updateSpeaker(){
+  const entry=state.selected;
+  els.speaker.hidden=!entry||els.waveform.hidden;
+  els.speaker.disabled=!state.signals;
+  const on=!!entry&&state.voices.has(entry.name);
+  els.speaker.textContent=on?'🔊 Sound on':'🔇 Sound off';
+  els.speaker.setAttribute('aria-pressed',String(on));
+  els.speaker.setAttribute('aria-label',on?'Disable this feed’s sound':'Enable this feed’s sound');
+  els.midiReadout.hidden=!on;
+  if(!on)els.midiReadout.textContent='';
+}
+function voiceLevel(){
+  if(!state.audio)return;
+  const count=state.voices.size;
+  state.audio.master.gain.setTargetAtTime(count?.32/Math.sqrt(count):0,state.audio.context.currentTime,.02);
+}
+async function enableVoice(entry){
+  if(!state.signals||state.selected!==entry||els.detailOverlay.hidden||els.detailOverlay.classList.contains('detail-exit'))return;
+  const generation=audioViewGeneration;
+  if(!state.audio){
+    const context=new AudioContext();
+    const master=context.createGain();master.gain.value=0;
+    const limiter=context.createDynamicsCompressor();limiter.threshold.value=-12;limiter.ratio.value=8;
+    master.connect(limiter);limiter.connect(context.destination);
+    state.audio={context,master,limiter};
+  }
+  const {context,master}=state.audio;
+  await context.resume();
+  if(generation!==audioViewGeneration||state.audio?.context!==context||state.selected!==entry||
+      els.detailOverlay.hidden||els.detailOverlay.classList.contains('detail-exit'))return;
+  if(state.voices.has(entry.name))return;
+  const oscillator=context.createOscillator();oscillator.type='sawtooth';
+  const filter=context.createBiquadFilter();filter.type='lowpass';filter.Q.value=.7;
+  const gain=context.createGain();gain.gain.value=0;
+  oscillator.connect(filter);filter.connect(gain);gain.connect(master);
+  oscillator.start();
+  state.voices.set(entry.name,{entry,oscillator,filter,gain});
+  voiceLevel();updateSpeaker();syncAudio();
+}
+function disableVoice(name){
+  const voice=state.voices.get(name);if(!voice)return;
+  state.voices.delete(name);
+  const t=state.audio.context.currentTime;
+  voice.gain.gain.cancelScheduledValues(t);
+  voice.gain.gain.setTargetAtTime(0,t,.008);
+  voice.oscillator.stop(t+.09);
+  voice.oscillator.onended=()=>{voice.oscillator.disconnect();voice.filter.disconnect();voice.gain.disconnect();};
+  voiceLevel();updateSpeaker();
+}
+function muteAll(){for(const name of [...state.voices.keys()])disableVoice(name);}
+function stopPatientAudio(){
+  audioViewGeneration++;
+  muteAll();
+}
+function syncAudio(){
+  if(!state.audio||!state.voices.size)return;
+  const t=state.audio.context.currentTime;
+  for(const voice of state.voices.values()){
+    const sample=feedPaused(voice.entry)?null:signalAt(voice.entry,feedClock(voice.entry));
+    const mapping=sample&&SignalMapping.midi(sample.flow,sample.pressure);
+    const target=mapping?.frequency??voice.oscillator.frequency.value;
+    voice.oscillator.frequency.setTargetAtTime(target,t,.025);
+    if(mapping)voice.filter.frequency.setTargetAtTime(mapping.cutoff,t,.025);
+    voice.gain.gain.setTargetAtTime(mapping?.07:0,t,.018);
+    if(state.selected===voice.entry&&!els.detailOverlay.hidden){
+      els.midiReadout.textContent=mapping?`MIDI ${mapping.pitch.toFixed(1)} · pressure ${sample.pressure.toFixed(1)} cmH₂O → CC74 ${mapping.cc74}`:'No sample · silent';
+    }
+  }
+}
+function fit(canvas) {
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  const w = Math.max(1, Math.round(canvas.clientWidth * dpr)), h = Math.max(1, Math.round(canvas.clientHeight * dpr));
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+  const ctx = canvas.getContext('2d');
+  // Live draws in CSS pixels. Review draws in backing-store pixels on the
+  // same canvases, so clear the transform even when their size did not change.
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  return {ctx, w, h, dpr};
+}
+function rotate(point, yaw, pitch) {
+  const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+  const x = point.x * cy - point.z * sy, z0 = point.x * sy + point.z * cy;
+  return {x, y: point.y * cp - z0 * sp, z: point.y * sp + z0 * cp};
+}
+function project(point, yaw, pitch, width, height, zoom = 1) {
+  const p = rotate(point, yaw, pitch), distance = 530, perspective = distance / (distance - p.z);
+  const scale = Math.min(width, height) / 410 * zoom;
+  return {x: width / 2 + p.x * perspective * scale, y: height / 2 - p.y * perspective * scale, z: p.z, scale: perspective * scale};
+}
+function makePositions(entries) {
+  state.layout=HospitalLayout.createHospitalAtlas(entries.filter(e=>e.unit!==null),
+    state.model.unitDefinitions,state.organization);
+  state.nodes=state.layout.nodes;
+  state.units=state.layout.units;
+  state.corridors=state.layout.corridors;
+}
+function projectPlacements(){
+  const byName=new Map(state.entries.map(e=>[e.name,e]));
+  for(const entry of state.entries){entry.unit=null;entry.room=null;}
+  for(const unit of state.model.unitDefinitions)for(let room=1;room<=HospitalSystem.BEDS_PER_UNIT;room++){
+    const name=state.organization.placements[HospitalSystem.bedId(unit.unit_id,room)];
+    if(name){const entry=byName.get(name);entry.unit=unit.legacy_number;entry.room=room;}
+  }
+  makePositions(state.entries);
+  state.selectedNode=state.selected?state.nodes.find(n=>n.entry===state.selected):null;
+  listEntries();drawAtlas();
+}
+function saveOrganization(){
+  try{localStorage.setItem(LAYOUT_KEY,JSON.stringify(state.organization));return true;}
+  catch(error){state.layoutIssues=[`Browser storage unavailable: ${error.message}`];return false;}
+}
+function commitOrganization(next){
+  const issues=HospitalSystem.validateState(next,state.model);
+  if(issues.length)throw new Error(issues.join('; '));
+  state.organization=next;state.proposal=null;
+  projectPlacements();saveOrganization();
+  state.atlasCenter={x:0,y:0};state.atlasZoom=defaultAtlasZoom();
+  if(state.bedManagerView)showBedManager();
+  else if(state.hospitalView)showHospital(state.hospitalView,state.floorLevel);
+  else showHospitals();
+}
+function matchesFilter(e){return `${e.name} ${e.id} rpi${e.rpi} ${e.suffix} unit ${e.unit} room ${e.room}`.toLowerCase().includes(state.filter);}
+function atlasInsets(dpr){return {top:document.querySelector('.site-head').offsetHeight*dpr,bottom:document.querySelector('.atlas-footer').offsetHeight*dpr};}
+function atlasScale(w,h){
+  const dpr=els.atlas.width/els.atlas.clientWidth,{top,bottom}=atlasInsets(dpr);
+  const width=state.layout?.extentWidth||1200,height=state.layout?.extentHeight||1200;
+  return Math.max(.06,Math.min((w-40*dpr)/width,(h-top-bottom-40*dpr)/height))*state.atlasZoom;
+}
+function atlasNodeSide(node,scale,dpr){
+  if(node.kind==='room'||node.kind==='open-room')return state.layout.roomSize*scale;
+  if(node.kind==='unit'||node.kind==='open-floor')return scale>.28?Math.max(18*dpr,26*scale):26*scale;
+  if(node.kind==='hospital')return state.layout.hospitalHalf*2*scale;
+  return 48*scale;
+}
+function atlasTitle(ctx,label,x,y,width,height,fontSize,dpr){
+  ctx.fillStyle='#0b2431';ctx.fillRect(x,y,width,height);
+  ctx.strokeStyle='#7193a0';ctx.lineWidth=dpr;ctx.strokeRect(x,y,width,height);
+  ctx.fillStyle='#e7f5f7';ctx.font=`600 ${fontSize}px system-ui`;
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(label,x+width/2,y+height/2,width-8*dpr);
+  ctx.textBaseline='alphabetic';
+}
+function drawAtlas() {
+  if(els.atlas.getAttribute('aria-hidden')==='true'){state.projected=[];return;}
+  const {ctx,w,h,dpr}=fit(els.atlas);ctx.clearRect(0,0,w,h);
+  const gradient=ctx.createRadialGradient(w*.5,h*.5,20,w*.5,h*.5,Math.max(w,h)*.7);
+  gradient.addColorStop(0,'#17313f');gradient.addColorStop(1,'#091823');
+  ctx.fillStyle=gradient;ctx.fillRect(0,0,w,h);
+  const scale=atlasScale(w,h);
+  const {top,bottom}=atlasInsets(dpr),centerY=top+(h-top-bottom)/2;
+  state.projected=state.nodes.map(node=>({x:w/2+(node.x-state.atlasCenter.x)*scale,y:centerY+(node.y-state.atlasCenter.y)*scale,node}));
+  const levels=new Map(),unitLevels=new Map(),hospitalLevels=new Map();
+  const hospitalByUnit=new Map(state.nodes.filter(node=>node.kind==='unit').map(node=>[node.unit,node.hospital_key]));
+  const rootLevel={flow:0,pressure:0,count:0};
+  if(state.signals){
+    for(const entry of state.entries){
+      const level=signalAt(entry,feedClock(entry));levels.set(entry.name,level);
+      if(!level)continue;
+      const unit=unitLevels.get(entry.unit)||{flow:0,pressure:0,count:0};
+      unit.flow+=level.flow;unit.pressure+=level.pressure;unit.count++;
+      unitLevels.set(entry.unit,unit);
+      const key=hospitalByUnit.get(entry.unit);
+      if(key){
+        const hospital=hospitalLevels.get(key)||{flow:0,pressure:0,count:0};
+        hospital.flow+=level.flow;hospital.pressure+=level.pressure;hospital.count++;
+        hospitalLevels.set(key,hospital);
+      }
+      rootLevel.flow+=level.flow;rootLevel.pressure+=level.pressure;rootLevel.count++;
+    }
+  }
+  const projectedByKey=new Map(state.projected.map(p=>[p.node.key,p]));
+  ctx.lineCap='butt';
+  for(const corridor of state.corridors){
+    const from=projectedByKey.get(corridor.from),to=projectedByKey.get(corridor.to);
+    const x1=from.x+(corridor.x1-from.node.x)*scale,y1=from.y+(corridor.y1-from.node.y)*scale;
+    const x2=to.x+(corridor.x2-to.node.x)*scale,y2=to.y+(corridor.y2-to.node.y)*scale;
+    ctx.strokeStyle='#68a7b6';ctx.lineWidth=Math.max(5*dpr,10*scale);
+    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  }
+  for(const hub of state.projected.filter(p=>
+    ['root','hospital','unit','open-floor'].includes(p.node.kind))){
+    const node=hub.node;
+    const half=(node.kind==='root'?state.layout.rootHalf:
+      node.kind==='hospital'?state.layout.hospitalHalf:state.layout.unitHalf)*scale;
+    const top=node.kind==='unit'||node.kind==='open-floor'?state.layout.unitTop*scale:half;
+    const active=node===state.selectedNode||node.kind==='unit'&&state.selectedNode?.unit===node.unit;
+    ctx.fillStyle=active?'#243e50':'#17303c';
+    const hospitalLevel=hospitalLevels.get(node.key);
+    ctx.strokeStyle=active?'#a0dce5':node.kind==='hospital'&&hospitalLevel?.count?
+      SignalMapping.flowColor(hospitalLevel.flow/hospitalLevel.count,state.reverseFlow):'#4c7685';
+    ctx.lineWidth=Math.max(dpr,node.kind==='hospital'?3*scale:1.5*scale);
+    ctx.fillRect(hub.x-half,hub.y-top,2*half,top+half);
+    ctx.strokeRect(hub.x-half,hub.y-top,2*half,top+half);
+    if(node.kind==='hospital'){
+      if(scale>=.5){
+        atlasTitle(ctx,node.label,hub.x-half+6*scale,hub.y-half+6*scale,
+          2*half-12*scale,state.layout.hospitalHeader*scale,
+          Math.max(10*dpr,14*scale),dpr);
+      }else if(scale>=.22){
+        const width=Math.max(72*dpr,Math.min(2*half,170*dpr));
+        atlasTitle(ctx,node.label,hub.x-width/2,hub.y-half-20*dpr,
+          width,18*dpr,10*dpr,dpr);
+      }
+    }else if((node.kind==='unit'||node.kind==='open-floor')&&scale>=.75){
+      atlasTitle(ctx,node.kind==='open-floor'?`F${node.floor_level} · OPEN FLOOR`:
+        `${node.floor_level?`F${node.floor_level} · `:''}UNIT ${String(node.unit).padStart(2,'0')}`,
+        hub.x-half+2*scale,hub.y-top+2*scale,2*half-4*scale,16*scale,
+        Math.max(8*dpr,10*scale),dpr);
+    }else if(node.kind==='root'&&scale>=.22){
+      atlasTitle(ctx,'DATABASE',hub.x-46*dpr,hub.y-half-20*dpr,
+        92*dpr,18*dpr,10*dpr,dpr);
+    }
+    if(node.kind==='hospital'&&hospitalLevel?.count){
+      ctx.fillStyle=SignalMapping.pressureColor(hospitalLevel.pressure/hospitalLevel.count);
+      ctx.fillRect(hub.x-half+4*dpr,hub.y-half+4*dpr,5*dpr,5*dpr);
+    }
+  }
+  for(const p of state.projected){
+    const node=p.node,selected=node===state.selectedNode,hovered=node===state.hover,entry=node.entry;
+    if(node.kind==='hospital')continue;
+    const match=!state.filter||node.kind==='root'||node.kind==='open-floor'||node.kind==='open-room'||
+      (node.kind==='unit'&&state.units.get(node.unit).some(matchesFilter))||(entry&&matchesFilter(entry));
+    ctx.globalAlpha=match?1:.15;
+    const unitLevel=unitLevels.get(node.unit);
+    const level=node.kind==='root'&&rootLevel.count?{flow:rootLevel.flow/rootLevel.count,pressure:rootLevel.pressure/rootLevel.count}:
+      node.kind==='unit'&&unitLevel?.count?{flow:unitLevel.flow/unitLevel.count,pressure:unitLevel.pressure/unitLevel.count}:
+      entry?levels.get(entry.name):null;
+    const side=atlasNodeSide(node,scale,dpr);
+    ctx.fillStyle=entry||node.kind!=='room'&&node.kind!=='open-room'&&node.kind!=='open-floor'?
+      SignalMapping.pressureColor(level?.pressure):'#243b45';
+    ctx.fillRect(p.x-side/2,p.y-side/2,side,side);
+    ctx.strokeStyle=entry||node.kind!=='room'&&node.kind!=='open-room'&&node.kind!=='open-floor'?
+      SignalMapping.flowColor(level?.flow,state.reverseFlow):'#6c8992';
+    ctx.lineWidth=Math.max(dpr,2.5*scale);ctx.strokeRect(p.x-side/2,p.y-side/2,side,side);
+    if(selected||hovered){ctx.strokeStyle='#fff';ctx.lineWidth=1.5*dpr;ctx.strokeRect(p.x-side/2-3*dpr,p.y-side/2-3*dpr,side+6*dpr,side+6*dpr);}
+    if((node.kind==='room'||node.kind==='open-room')&&scale>.3){const text=node.room===7?'S':node.room===8?'B':String(node.room);ctx.fillStyle='#f1fbfd';ctx.strokeStyle='#071923';ctx.lineWidth=2*dpr;ctx.font=`${8*dpr}px system-ui`;ctx.textAlign='center';ctx.strokeText(text,p.x,p.y+3*dpr);ctx.fillText(text,p.x,p.y+3*dpr);}
+    if((node.kind==='unit'||node.kind==='open-floor')&&scale>.28){ctx.fillStyle='#f1fbfd';ctx.strokeStyle='#071923';ctx.lineWidth=2*dpr;ctx.font=`${8*dpr}px system-ui`;ctx.textAlign='center';ctx.strokeText('NS',p.x,p.y+3*dpr);ctx.fillText('NS',p.x,p.y+3*dpr);}
+    if(node.kind==='root'&&scale>.44){ctx.fillStyle='#fff2d7';ctx.font=`${11*dpr}px system-ui`;ctx.textAlign='center';ctx.fillText('DB',p.x,p.y+4*dpr);}
+    ctx.globalAlpha=1;
+  }
+  if(state.hover){
+    const p=state.projected.find(q=>q.node===state.hover),node=state.hover;
+    const label=node.kind==='root'?'Hospital database':node.kind==='hospital'?node.label:
+      node.kind==='unit'?`Unit ${String(node.unit).padStart(2,'0')} nursing station`:
+      node.kind==='open-floor'?`Floor ${node.floor_level} · Open floor`:
+      node.kind==='open-room'?`Floor ${node.floor_level} · ${node.room===7?'Supply room':node.room===8?'Break room':`Room ${String(node.room).padStart(2,'0')} (open)`}`:
+      node.room===7?`Unit ${String(node.unit).padStart(2,'0')} · Supply room`:
+      node.room===8?`Unit ${String(node.unit).padStart(2,'0')} · Break room`:
+      `Unit ${String(node.unit).padStart(2,'0')} · Room ${String(node.room).padStart(2,'0')}${node.entry?'':' (open)'}`;
+    const top=node.kind==='hospital'?state.layout.hospitalHalf*scale:
+      node.kind==='unit'||node.kind==='open-floor'?state.layout.unitTop*scale:24*dpr;
+    if(node.kind==='room'||node.kind==='open-room'||
+      (node.kind==='unit'||node.kind==='open-floor')&&scale<.75){
+      ctx.font=`600 ${11*dpr}px system-ui`;
+      const width=Math.min(300*dpr,Math.max(90*dpr,ctx.measureText(label).width+16*dpr));
+      atlasTitle(ctx,label,p.x-width/2,p.y-top-25*dpr,width,20*dpr,11*dpr,dpr);
+    }
+  }
+}
+function listEntries() {
+  els.list.replaceChildren();
+  const visible=state.entries.filter(e=>!state.filter||matchesFilter(e));
+  els.listCount.textContent=`${visible.length} of ${state.entries.length} feeds`;
+  const fragment=document.createDocumentFragment();
+  for(const e of visible){
+    const button=document.createElement('button');button.className='recording-item'+(e===state.selected?' selected':'');button.type='button';
+    const virtualRoom=fullCatalogByRecording.get(e.name);
+    const strong=document.createElement('strong');strong.textContent=`${virtualRoom?`Hospital ${virtualRoom.hospital_id} · Floor ${virtualRoom.floor} · Room ${String(virtualRoom.room).padStart(2,'0')}`:
+      e.unit===null?'Unassigned':`Unit ${String(e.unit).padStart(2,'0')} · Room ${String(e.room).padStart(2,'0')}`} · ${clock(e.samples/RATE)}`;
+    const small=document.createElement('small');small.textContent=`${e.shiftedStart}${e.suffix?' · '+e.suffix:''} · ${e.id.slice(0,12)}…`;
+    button.title=e.name;button.append(strong,small);button.onclick=()=>selectEntry(e);fragment.append(button);
+  }
+  els.list.append(fragment);
+}
+function bytesLabel(bytes){return `${(bytes/1048576).toFixed(1)} MiB`;}
+function renderSegmentProgress(stats){
+  els.segmentProgressBar.max=stats.totalBytes||1;
+  els.segmentProgressBar.value=stats.verifiedBytes;
+  els.segmentProgressText.textContent=`First 30-minute ranges: ${bytesLabel(stats.firstBytesReceived)} received / ${bytesLabel(stats.totalBytes)} expected · ${stats.ready}/${stats.total} feeds ready · ${stats.failed} failed`;
+  els.segmentFailures.hidden=!stats.failed;els.retrySegments.hidden=!stats.failed;
+  els.segmentFailureList.replaceChildren(...stats.failures.map(failure=>{
+    const item=document.createElement('li');item.textContent=`${failure.name}: ${failure.error}`;return item;
+  }));
+}
+function segmentNumber(entry,sample){
+  const count=state.segmentStore.index.feeds[entry.name].segments.length;
+  return Math.min(count-1,Math.max(0,Math.floor(sample/state.segmentStore.index.segmentSamples)));
+}
+function feedData(entry){
+  let data=state.cache.get(entry.name);
+  if(data){state.cache.delete(entry.name);state.cache.set(entry.name,data);return data;}
+  data=SegmentedWaveform.create(state.segmentStore.index.feeds[entry.name]);
+  state.cache.set(entry.name,data);
+  if(state.cache.size>8)state.cache.delete(state.cache.keys().next().value);
+  return data;
+}
+function analyzeBrowser(data,complete,breath){
+  const start=complete.start,end=complete.end;
+  if(data.timestamped){
+    for(let i=start+1;i<end;i++){
+      const dt=data.times[i]-data.times[i-1];
+      if(!Number.isFinite(dt)||dt<=0||dt>.1)return {status:'unavailable',breath:breath.number,
+        reason:'Invalid source timestamp interval in this breath.'};
+    }
+  }
+  return BrowserResearch.analyze(data.flow.subarray(start,end),data.pressure.subarray(start,end),
+    breath.number,breath.marker,1/RATE);
+}
+function ensureSegment(entry,data,number){
+  if(data.loadedSegments.has(number))return Promise.resolve(data);
+  if(data.loadingSegments.has(number))return data.loadingSegments.get(number);
+  data.failedSegments.delete(number);
+  const request=(async()=>{
+    const bytes=await state.segmentStore.get(entry.name,number);
+    const parsed=SegmentedWaveform.parse(new TextDecoder().decode(bytes));
+    SegmentedWaveform.ingest(data,state.segmentStore.segment(entry.name,number),number,
+      parsed,CalculatedVolume,BreathMetrics,RATE);
+    if(state.selected===entry&&state.data===data){
+      els.loadStatus.textContent=`Ready · ${state.active?'playing':'paused'} at ${els.speed.value}×${data.bad?` · ${data.bad} unparsed line(s)`:''}`;
+      drawAll();
+    }
+    return data;
+  })().catch(error=>{data.failedSegments.add(number);throw error;})
+    .finally(()=>data.loadingSegments.delete(number));
+  data.loadingSegments.set(number,request);
+  return request;
+}
+function ensureAt(entry,data,sample){return ensureSegment(entry,data,segmentNumber(entry,sample));}
+function focusUnit(unit){
+  const node=state.nodes.find(n=>n.kind==='unit'&&n.unit===unit);
+  if(node){state.atlasCenter={x:node.x,y:node.y};state.atlasZoom=2.8;}
+}
+function stopUnitPlayback(){
+  const playback=state.unitPlayback;
+  if(!playback)return;
+  playback.active=false;
+  for(const controller of playback.controllers)controller.abort();
+  state.unitPlayback=null;
+}
+function cancelStream(){
+  stopPatientAudio();
+  window.RoomLive.pause();
+  state.seekGeneration++;
+  if(state.seekTimer){clearTimeout(state.seekTimer);state.seekTimer=null;}
+  stopUnitPlayback();
+  if(state.pending)state.pending.abort();
+  state.active=false;state.lastFrame=0;state.position=0;state.selected=null;state.data=null;
+  setControls(false);
+}
+let detailMotionId=0,detailCloseTimer=null;
+function resetDetailMotion(){
+  detailMotionId++;
+  if(detailCloseTimer){clearTimeout(detailCloseTimer);detailCloseTimer=null;}
+  els.detailOverlay.classList.remove('detail-enter','detail-exit');
+}
+function openDetail(){
+  resetDetailMotion();
+  $('viewOnCube').hidden=!(state.unitPlayback&&els.streamTitle.textContent.endsWith('six patient beds'));
+  const roomOpen=!els.waveform.hidden;
+  els.streamTitle.classList.toggle('room-title',roomOpen);
+  els.streamMeta.classList.toggle('patient-id',roomOpen);
+  $('recordingInfo').hidden=!roomOpen;
+  $('notesSummary').textContent=roomOpen?'Recording details & data notes':'About this dataset';
+  $('recordingNotes').open=false;
+  els.directoryOverlay.hidden=true;els.detailOverlay.hidden=false;els.detailOverlay.inert=false;
+  const popup=els.detailOverlay.querySelector('.popup');
+  popup.scrollTop=0;
+  if(!matchMedia('(prefers-reduced-motion: reduce)').matches){
+    void popup.offsetWidth;
+    els.detailOverlay.classList.add('detail-enter');
+  }
+  requestAnimationFrame(()=>{if(state.data)drawAll();});
+}
+function closeDetails(){
+  stopPatientAudio();
+  window.RoomLive.pause();
+  state.active=false;state.lastFrame=0;stopUnitPlayback();
+  if(els.detailOverlay.hidden||els.detailOverlay.classList.contains('detail-exit'))return;
+  resetDetailMotion();
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){els.detailOverlay.hidden=true;return;}
+  const motionId=detailMotionId;
+  els.detailOverlay.inert=true;
+  void els.detailOverlay.querySelector('.popup').offsetWidth;
+  els.detailOverlay.classList.add('detail-exit');
+  detailCloseTimer=setTimeout(()=>{
+    if(detailMotionId!==motionId)return;
+    els.detailOverlay.hidden=true;els.detailOverlay.classList.remove('detail-exit');detailCloseTimer=null;
+  },320);
+}
+function openDirectory(){
+  stopPatientAudio();
+  window.RoomLive.pause();
+  state.active=false;state.lastFrame=0;stopUnitPlayback();resetDetailMotion();
+  els.detailOverlay.hidden=true;els.detailOverlay.inert=true;els.directoryOverlay.hidden=false;
+  $('search').focus();
+}
+function closeDirectory(){els.directoryOverlay.hidden=true;}
+function breadcrumbButton(label,action){
+  const button=document.createElement('button');button.type='button';button.textContent=label;button.onclick=action;return button;
+}
+function renderBreadcrumbs(unit,room){
+  els.breadcrumbs.replaceChildren();
+  const virtualRoom=state.selected&&fullCatalogByRecording.get(state.selected.name);
+  if(virtualRoom){
+    els.breadcrumbs.append(breadcrumbButton('Virtual campus',()=>{
+      closeDetails();els.hospitalScene.contentWindow?.postMessage({type:'zebezo-scene-action',action:'reset'},location.origin);
+    }),' › ',`Hospital ${virtualRoom.hospital_id}`,' › ',`Floor ${virtualRoom.floor}`,' › ',`Room ${String(virtualRoom.room).padStart(2,'0')}`);
+    return;
+  }
+  els.breadcrumbs.append(breadcrumbButton('Hospitals',showHospitals),' › ',breadcrumbButton('All feeds database',showRoot));
+  const unitId=unit?HospitalSystem.unitId(unit):null;
+  const floor=unitId?HospitalSystem.floorForUnit(state.organization,unitId):null;
+  const hospital=floor&&state.organization.hospitalDefinitions.find(h=>h.hospital_id===floor.hospital_id);
+  if(hospital)els.breadcrumbs.append(' › ',breadcrumbButton(hospital.display_name,()=>showHospital(hospital.hospital_id)));
+  if(floor)els.breadcrumbs.append(' › ',breadcrumbButton(`Floor ${floor.level}`,()=>showHospital(floor.hospital_id,floor.level)));
+  if(unit){els.breadcrumbs.append(' › ',breadcrumbButton(`Unit ${String(unit).padStart(2,'0')} nursing station`,()=>showUnit(unit)));}
+  if(room){els.breadcrumbs.append(' › ',`Room ${String(room).padStart(2,'0')}`);}
+}
+function databaseCard(title,description,action,empty=false){
+  const button=document.createElement('button');button.type='button';button.className='database-card'+(empty?' empty':'');button.disabled=empty;
+  const strong=document.createElement('strong'),small=document.createElement('small');strong.textContent=title;small.textContent=description;
+  button.append(strong,small);if(action)button.onclick=action;return button;
+}
+function showRoot(openPopup=true){
+  cancelStream();state.hospitalView=null;state.floorLevel=null;state.bedManagerView=false;state.selectedNode=state.nodes[0];state.atlasCenter={x:0,y:0};state.atlasZoom=defaultAtlasZoom();
+  els.waveform.hidden=true;els.database.hidden=false;updateSpeaker();els.streamLabel.textContent='ALL-FEEDS DATABASE';
+  els.streamTitle.textContent='Virtual hospital catalog';
+  els.streamMeta.textContent=`${state.entries.length-HospitalSystem.occupancy(state.organization,state.model).unassigned} occupied virtual rooms · ${state.units.size} six-bed units · ${state.entries.reduce((sum,e)=>sum+e.samples,0).toLocaleString()} samples`;
+  els.loadStatus.textContent='Catalog ready';renderBreadcrumbs();
+  els.database.replaceChildren();
+  const intro=document.createElement('p');intro.className='database-intro';intro.textContent='Each unit has six patient beds, a supply room, and a break room around its nursing station. Select a station to inspect its rooms. One recording occupies each assigned room; the CSVs do not identify patients or real hospital rooms.';
+  const grid=document.createElement('div');grid.className='database-grid';
+  for(const [unit,members] of state.units){
+    const samples=members.reduce((sum,e)=>sum+e.samples,0);
+    grid.append(databaseCard(`Unit ${String(unit).padStart(2,'0')} nursing station`,`${members.length} of 6 beds occupied · ${samples.toLocaleString()} samples`,()=>showUnit(unit)));
+  }
+  els.database.append(intro,grid);listEntries();drawAtlas();if(openPopup)openDetail();
+}
+function message(textValue,css='database-intro'){
+  const el=document.createElement('p');el.className=css;el.textContent=textValue;return el;
+}
+function svgElement(name,attributes={}){
+  const element=document.createElementNS('http://www.w3.org/2000/svg',name);
+  for(const [key,value] of Object.entries(attributes))element.setAttribute(key,String(value));
+  return element;
+}
+function renderBuilding(hospital,slots,selectedLevel){
+  const section=document.createElement('section');section.className='building-section';
+  const heading=document.createElement('div');heading.className='building-heading';
+  const title=document.createElement('h3');title.textContent=`${hospital.display_name} · building view`;
+  const controls=document.createElement('div');controls.className='building-controls';
+  for(const [orientation,label] of [['south-east','South + East'],['north-west','North + West']]){
+    const button=document.createElement('button');button.type='button';button.textContent=label;
+    button.className=state.buildingFaces===orientation?'selected':'';
+    button.setAttribute('aria-pressed',state.buildingFaces===orientation?'true':'false');
+    button.onclick=()=>{state.buildingFaces=orientation;section.replaceWith(renderBuilding(hospital,slots,selectedLevel));};
+    controls.append(button);
+  }
+  heading.append(title,controls);section.append(heading);
+  const frontFace=state.buildingFaces==='south-east'?'south':'north';
+  const sideFace=state.buildingFaces==='south-east'?'east':'west';
+  const svg=svgElement('svg',{viewBox:'0 0 900 550',role:'group',
+    'aria-label':`${hospital.display_name} virtual four-floor building, ${frontFace} and ${sideFace} facades`});
+  svg.classList.add('building-svg');
+  const front=(u,v)=>({x:205+455*u,y:125+v});
+  const side=(u,v)=>({x:660+150*u,y:125-60*u+v});
+  const polygon=(points,className)=>svgElement('polygon',{
+    points:points.map(point=>`${point.x},${point.y}`).join(' '),class:className});
+  const frontPoly=(top,bottom)=>polygon([front(0,top),front(1,top),front(1,bottom),front(0,bottom)],'building-front');
+  const sidePoly=(top,bottom)=>polygon([side(0,top),side(1,top),side(1,bottom),side(0,bottom)],'building-side');
+  svg.append(svgElement('ellipse',{cx:515,cy:513,rx:335,ry:22,class:'building-shadow'}));
+  svg.append(sidePoly(0,360),frontPoly(0,360));
+  if(selectedLevel){
+    const top=(4-selectedLevel)*90;
+    svg.append(polygon([front(0,top),front(1,top),front(1,top+90),front(0,top+90)],'building-selected-floor'));
+    svg.append(polygon([side(0,top),side(1,top),side(1,top+90),side(0,top+90)],'building-selected-floor'));
+  }
+  for(let floor=1;floor<4;floor++){
+    const v=floor*90,a=front(0,v),b=front(1,v),c=side(1,v);
+    svg.append(svgElement('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,class:'building-floor-line'}));
+    svg.append(svgElement('line',{x1:b.x,y1:b.y,x2:c.x,y2:c.y,class:'building-floor-line'}));
+  }
+  svg.append(polygon([{x:205,y:125},{x:660,y:125},{x:810,y:65},{x:355,y:65}],'building-roof'));
+  svg.append(svgElement('rect',{x:260,y:90,width:72,height:32,rx:3,class:'building-elevator-top'}));
+  const roofLabel=svgElement('text',{x:505,y:108,class:'building-roof-label','text-anchor':'middle'});
+  roofLabel.textContent='VIRTUAL HOSPITAL';svg.append(roofLabel);
+  for(let level=4;level>=1;level--){
+    const unitId=slots[level-1];
+    const levelLabel=svgElement('text',{x:174,y:125+(4-level)*90+52,
+      class:'building-level-label','text-anchor':'middle'});
+    levelLabel.textContent=`F${level}`;svg.append(levelLabel);
+    for(const window of FloorPlan.facadeWindows().filter(item=>
+      item.facade===frontFace||item.facade===sideFace)){
+      const onFront=window.facade===frontFace,point=onFront?front:side;
+      const half=onFront?.077:.17,top=(4-level)*90+29,bottom=top+43;
+      const u=window.position;
+      const pane=polygon([point(u-half,top),point(u+half,top),
+        point(u+half,bottom),point(u-half,bottom)],'building-window-pane');
+      const name=unitId&&state.organization.placements[HospitalSystem.bedId(unitId,window.room)];
+      const group=svgElement('g',{class:`building-window${name?' occupied':''}${unitId?'':' vacant-floor'}`,
+        role:'button',tabindex:0,
+        'aria-label':`Floor ${level}, ${window.room===7?'supply room':window.room===8?'break room':`room ${window.room}`}, ${name?'assigned feed':window.room>6?'shared space':unitId?'open bed':'open floor'}. Open floor plan.`});
+      group.append(pane);
+      const left=point(u-half,top),right=point(u+half,top);
+      const mid=point(u,top),midBottom=point(u,bottom);
+      group.append(svgElement('line',{x1:mid.x,y1:mid.y,x2:midBottom.x,y2:midBottom.y,class:'building-mullion'}));
+      group.append(svgElement('line',{x1:left.x-2,y1:left.y+45,x2:right.x+2,y2:right.y+45,class:'building-sill'}));
+      const center=point(u,top+25),text=svgElement('text',{
+        x:center.x,y:center.y,class:'building-window-label','text-anchor':'middle'});
+      text.textContent=window.room===7?'S':window.room===8?'B':String(window.room).padStart(2,'0');group.append(text);
+      const activate=()=>showHospital(hospital.hospital_id,level,window.room);
+      group.addEventListener('click',activate);
+      group.addEventListener('keydown',event=>{
+        if(event.key==='Enter'||event.key===' '){event.preventDefault();activate();}
+      });
+      svg.append(group);
+    }
+  }
+  section.append(svg,message('Each window maps to a patient or shared room on its floor. Switch views to see all eight windows. Select a window to open its floor plan.','building-hint'));
+  return section;
+}
+function renderFloorMap(hospitalId,level,unitId,selectedRoom=null){
+  const plan=FloorPlan,unit=state.model.unitDefinitions.find(item=>item.unit_id===unitId);
+  const section=document.createElement('section');section.className='floor-map';
+  const heading=document.createElement('div');heading.className='floor-map-heading';
+  const title=document.createElement('h3');title.textContent=`Floor ${level} · ${unit?.display_name||'Open floor'}`;
+  const hint=message('Generated virtual plan · select a room for its elevator route and waveform, or NS for unit playback.','floor-map-hint');
+  heading.append(title,hint);section.append(heading);
+  const svg=svgElement('svg',{viewBox:`0 0 ${plan.width} ${plan.height}`,
+    role:'group','aria-label':`Virtual floor ${level} map with six beds, walls, hallways, nursing station and elevator`});
+  svg.classList.add('floor-svg');
+  svg.append(svgElement('rect',{x:25,y:20,width:850,height:600,class:'floor-shell'}));
+  for(const [from,to] of plan.edges){
+    const a=plan.points[from],b=plan.points[to];
+    svg.append(svgElement('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,class:'floor-hallway'}));
+  }
+  const routeLayer=svgElement('g',{class:'floor-route'});svg.append(routeLayer);
+  svg.append(svgElement('rect',{x:25,y:20,width:850,height:600,class:'floor-outer-wall'}));
+  const info=document.createElement('div');info.className='floor-map-info';
+  const setInfo=(kind,room=null,entry=null)=>{
+    routeLayer.replaceChildren();
+    const destination=['room','supply','break'].includes(kind)?`room_${room}`:kind==='station'?'station':null;
+    if(destination){
+      const path=plan.route('elevator',destination);
+      for(let i=1;i<path.length;i++){
+        const a=plan.points[path[i-1]],b=plan.points[path[i]];
+        routeLayer.append(svgElement('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y}));
+      }
+    }
+    info.replaceChildren();
+    const label=document.createElement('strong');
+    label.textContent=kind==='elevator'?`Elevator · Floor ${level}`:
+      kind==='station'?`${unit?.display_name||'Open floor'} nursing station`:
+      kind==='supply'?'Supply room':kind==='break'?'Break room':
+      `Room ${String(room).padStart(2,'0')} · ${entry?'occupied feed':'open bed'}`;
+    info.append(label);
+    if(kind==='elevator'){
+      info.append(message('Choose another floor. The elevator connects the same lobby position on all four floors.'));
+      const buttons=document.createElement('div');buttons.className='floor-elevator-buttons';
+      for(let next=1;next<=HospitalSystem.MAX_UNITS;next++){
+        const button=document.createElement('button');button.type='button';
+        button.textContent=`Floor ${next}`;button.disabled=next===level;
+        button.onclick=()=>showHospital(hospitalId,next);buttons.append(button);
+      }
+      info.append(buttons);
+    }else{
+      info.append(message(destination?
+        `Connected to the elevator by ${plan.route('elevator',destination).length-1} hallway links.`:
+        'This floor has no assigned unit.'));
+      if(kind==='room'&&entry){
+        const button=document.createElement('button');button.type='button';
+        button.textContent='Open waveform';button.onclick=()=>selectEntry(entry);info.append(button);
+      }else if(kind==='station'&&unit){
+        const button=document.createElement('button');button.type='button';
+        button.textContent='Open unit playback';button.onclick=()=>showUnit(unit.legacy_number);info.append(button);
+      }
+    }
+  };
+  const addSpace=(space,label,kind,room=null,entry=null)=>{
+    const group=svgElement('g',{class:`floor-space ${kind}${entry?' occupied':''}`,
+      role:'button',tabindex:0,'aria-label':label});
+    group.append(svgElement('rect',{x:space.x,y:space.y,width:space.w,height:space.h,class:'floor-room-fill'}));
+    for(const [x1,y1,x2,y2] of plan.wallsFor(space))
+      group.append(svgElement('line',{x1,y1,x2,y2,class:'floor-wall'}));
+    for(const door of space.doors||[space.door])
+      group.append(svgElement('circle',{cx:door.x,cy:door.y,r:5,class:'floor-door'}));
+    const text=svgElement('text',{x:space.x+space.w/2,y:space.y+space.h/2,
+      'text-anchor':'middle','dominant-baseline':'middle'});
+    text.textContent=label;group.append(text);
+    const activate=()=>setInfo(kind,room,entry);
+    group.addEventListener('click',activate);
+    group.addEventListener('keydown',event=>{
+      if(event.key==='Enter'||event.key===' '){event.preventDefault();activate();}
+    });
+    svg.append(group);
+  };
+  for(const room of plan.rooms){
+    const name=unitId&&state.organization.placements[HospitalSystem.bedId(unitId,room.room)];
+    const entry=name?state.entries.find(item=>item.name===name):null;
+    addSpace(room,room.label||`Room ${String(room.room).padStart(2,'0')}`,room.kind||'room',room.room,entry);
+  }
+  addSpace(plan.station,'NS','station');
+  addSpace(plan.elevator,'Elevator','elevator');
+  section.append(svg,info);
+  if(Number.isInteger(selectedRoom)&&selectedRoom>=1&&selectedRoom<=8){
+    const name=unitId&&state.organization.placements[HospitalSystem.bedId(unitId,selectedRoom)];
+    setInfo(selectedRoom===7?'supply':selectedRoom===8?'break':'room',selectedRoom,name?state.entries.find(item=>item.name===name):null);
+  }else setInfo('elevator');
+  return section;
+}
+function hospitalMini(unit){
+  const grid=document.createElement('div');grid.className='hospital-mini-grid';
+  for(let room=1;room<=9;room++){
+    const cell=document.createElement('span');
+    if(room===5){cell.textContent='NS';cell.className='station';}
+    else{
+      const slot=room<5?room:room-1;
+      const entry=state.organization.placements[HospitalSystem.bedId(unit.unit_id,slot)];
+      cell.textContent=slot===7?'S':slot===8?'B':entry?String(slot):'·';cell.className=slot>6?'shared':entry?'occupied':'open';
+    }
+    grid.append(cell);
+  }
+  return grid;
+}
+function refreshHospitalStatuses(){
+  if(!state.signals)return;
+  for(const el of els.database.querySelectorAll('[data-hospital-status]')){
+    const units=state.organization.hospitalUnits[el.dataset.hospitalStatus];
+    let flow=0,pressure=0,count=0;
+    for(const id of units){
+      const unit=state.model.unitDefinitions.find(u=>u.unit_id===id);
+      for(const entry of state.units.get(unit.legacy_number)){
+        const sample=signalAt(entry,feedClock(entry));if(!sample)continue;
+        flow+=sample.flow;pressure+=sample.pressure;count++;
+      }
+    }
+    if(count){
+      const flowSwatch=el.children[0],pressureSwatch=el.children[1];
+      flowSwatch.style.background=SignalMapping.flowColor(flow/count,state.reverseFlow);
+      pressureSwatch.style.background=SignalMapping.pressureColor(pressure/count);
+      el.title=`Mean available atlas signals across ${count} assigned feeds; visual mapping, not an alarm`;
+    } else el.title='No available atlas signal values';
+  }
+}
+function showHospitals(openPopup=true){
+  state.hospitalView=null;state.floorLevel=null;state.bedManagerView=false;
+  els.waveform.hidden=true;els.database.hidden=false;updateSpeaker();
+  els.streamLabel.textContent='VIRTUAL HOSPITAL OVERVIEW';els.streamTitle.textContent='Hospitals';
+  const counts=HospitalSystem.occupancy(state.organization,state.model);
+  els.streamMeta.textContent=`${state.organization.hospitalDefinitions.length} hospitals · ${state.model.unitDefinitions.length} units · ${state.entries.length-counts.unassigned} assigned feeds`;
+  els.loadStatus.textContent='Layout ready';
+  els.breadcrumbs.replaceChildren(breadcrumbButton('Hospitals',showHospitals),' › ',breadcrumbButton('All feeds database',showRoot));
+  els.database.replaceChildren();
+  els.database.append(message('Virtual organization of recording feeds. Each hospital has four elevator-connected floor slots, with one unit per occupied floor. Locations here are simulated, not real patient locations.'));
+  for(const issue of state.layoutIssues)els.database.append(message(`Saved layout issue: ${issue}`,'layout-warning'));
+  const cards=document.createElement('div');cards.className='hospital-cards';
+  for(const hospital of state.organization.hospitalDefinitions){
+    const id=hospital.hospital_id,card=document.createElement('button');card.type='button';card.className='hospital-card';
+    const heading=document.createElement('strong');heading.textContent=hospital.display_name;
+    const count=document.createElement('small');count.textContent=`${counts.hospitals[id].units}/4 units · ${counts.hospitals[id].feeds} virtual patient feeds`;
+    const status=document.createElement('span');status.className='hospital-status';status.dataset.hospitalStatus=id;
+    const flowSwatch=document.createElement('i'),pressureSwatch=document.createElement('i');
+    status.append(flowSwatch,pressureSwatch,document.createTextNode('Average flow / pressure signal colors'));
+    const previews=document.createElement('div');previews.className='hospital-unit-previews';
+    state.organization.floorUnits[id].forEach((unitId,level)=>{
+      const unit=state.model.unitDefinitions.find(u=>u.unit_id===unitId);
+      const preview=document.createElement('div');preview.className='hospital-unit-preview';
+      preview.append(message(`Floor ${level+1} · ${unit?.display_name||'Open'}`,'hospital-unit-label'));
+      if(unit)preview.append(hospitalMini(unit));previews.append(preview);
+    });
+    card.append(heading,count,status,previews);card.onclick=()=>showHospital(id);cards.append(card);
+  }
+  els.database.append(cards);
+  listEntries();drawAtlas();refreshHospitalStatuses();if(openPopup)openDetail();
+}
+function showBedManager(){
+  state.managerHospitalId=state.hospitalView||state.managerHospitalId;
+  state.hospitalView=null;state.floorLevel=null;state.bedManagerView=true;
+  els.waveform.hidden=true;els.database.hidden=false;updateSpeaker();
+  const counts=HospitalSystem.occupancy(state.organization,state.model);
+  els.streamLabel.textContent='VIRTUAL LAYOUT';els.streamTitle.textContent='Bed Manager';
+  els.streamMeta.textContent=`${state.entries.length-counts.unassigned} assigned feeds · ${counts.unassigned} unassigned · ${state.model.unitDefinitions.length*8} beds`;
+  els.loadStatus.textContent='Layout ready';
+  els.breadcrumbs.replaceChildren(breadcrumbButton('Hospitals',showHospitals),' › ','Bed Manager');
+  els.database.replaceChildren(message('Arrange recording feeds in virtual beds and assign units to hospitals. Preview feed moves before applying them.'));
+  for(const issue of state.layoutIssues)els.database.append(message(`Saved layout issue: ${issue}`,'layout-warning'));
+  renderAssignmentControls();renderHospitalControls();
+  listEntries();drawAtlas();openDetail();
+  if(state.proposal)requestAnimationFrame(()=>els.database.querySelector('.organization-controls')?.scrollIntoView({block:'start'}));
+}
+function showHospital(id,requestedLevel=null,selectedRoom=null){
+  const hospital=state.organization.hospitalDefinitions.find(h=>h.hospital_id===id);
+  if(!hospital){showHospitals();return;}
+  const slots=state.organization.floorUnits[id];
+  const firstOccupied=slots.findIndex(Boolean)+1;
+  const level=Number.isInteger(requestedLevel)&&requestedLevel>=1&&requestedLevel<=4?
+    requestedLevel:firstOccupied||1;
+  const priorPlayback=state.unitPlayback;
+  const handoff=priorPlayback?{
+    elapsed:priorPlayback.started?priorPlayback.elapsed:sessionSeconds(),
+    active:priorPlayback.active||!priorPlayback.started}:null;
+  stopUnitPlayback();
+  state.hospitalView=id;state.floorLevel=level;state.bedManagerView=false;
+  state.selectedNode=state.nodes.find(node=>node.kind==='hospital'&&node.hospital_id===id);
+  els.waveform.hidden=true;els.database.hidden=false;updateSpeaker();
+  const counts=HospitalSystem.occupancy(state.organization,state.model).hospitals[id];
+  els.streamLabel.textContent='VIRTUAL HOSPITAL';els.streamTitle.textContent=hospital.display_name;
+  els.streamMeta.textContent=`${counts.units} of 4 floors occupied · ${counts.feeds} virtual patient feeds in occupied rooms`;
+  els.loadStatus.textContent='Layout ready';
+  els.breadcrumbs.replaceChildren(breadcrumbButton('Hospitals',showHospitals),' › ',
+    breadcrumbButton(hospital.display_name,()=>showHospital(id)),' › ',`Floor ${level}`);
+  els.database.replaceChildren(message('Select a building window or floor. Each facade window links to the corresponding room in the floor plan.'));
+  els.database.append(renderBuilding(hospital,slots,level));
+  const tabs=document.createElement('nav');tabs.className='floor-tabs';tabs.setAttribute('aria-label','Hospital floors');
+  for(let next=1;next<=HospitalSystem.MAX_UNITS;next++){
+    const unitId=slots[next-1],unit=state.model.unitDefinitions.find(item=>item.unit_id===unitId);
+    const button=document.createElement('button');button.type='button';
+    button.className='floor-tab'+(next===level?' selected':'');
+    button.setAttribute('aria-current',next===level?'page':'false');
+    const number=document.createElement('strong');number.textContent=`Floor ${next}`;
+    const detail=document.createElement('small');detail.textContent=unit?.display_name||'Open floor';
+    button.append(number,detail);button.onclick=()=>showHospital(id,next);tabs.append(button);
+  }
+  const floorMap=renderFloorMap(id,level,slots[level-1],selectedRoom);
+  els.database.append(tabs,floorMap);
+  els.database.append(renderFloorWaveforms(slots[level-1],level,handoff));
+  drawAtlas();openDetail();
+  if(selectedRoom)requestAnimationFrame(()=>floorMap.scrollIntoView({block:'start'}));
+}
+function showUnassignedUnits(ids){
+  state.hospitalView=null;state.floorLevel=null;state.bedManagerView=false;
+  state.selectedNode=state.nodes.find(node=>node.kind==='hospital'&&node.hospital_id===null&&
+    ids[0]===node.unit_ids[0]);
+  els.waveform.hidden=true;els.database.hidden=false;updateSpeaker();
+  els.streamLabel.textContent='VIRTUAL HOSPITAL OVERVIEW';els.streamTitle.textContent='Unassigned units';
+  els.streamMeta.textContent=`${ids.length} unit${ids.length===1?'':'s'} awaiting a hospital assignment`;
+  els.loadStatus.textContent='Layout ready';
+  els.breadcrumbs.replaceChildren(breadcrumbButton('Hospitals',showHospitals),' › ','Unassigned units');
+  els.database.replaceChildren(message('These units remain available for assignment to a hospital. Their room feeds are unchanged.'));
+  const grid=document.createElement('div');grid.className='hospital-cards';
+  for(const id of ids){
+    const unit=state.model.unitDefinitions.find(item=>item.unit_id===id);
+    const button=document.createElement('button');button.type='button';button.className='hospital-card';
+    const heading=document.createElement('strong');heading.textContent=unit.display_name;
+    const detail=document.createElement('small');detail.textContent=`${state.units.get(unit.legacy_number).length} of 6 beds occupied`;
+    button.append(heading,detail,hospitalMini(unit));button.onclick=()=>showUnit(unit.legacy_number);grid.append(button);
+  }
+  els.database.append(grid);drawAtlas();openDetail();
+}
+function makeSelect(options,value){
+  const select=document.createElement('select');
+  for(const [key,label] of options){const option=document.createElement('option');option.value=key;option.textContent=label;select.append(option);}
+  select.value=value;return select;
+}
+function renderAssignmentControls(){
+  const section=document.createElement('section');section.className='organization-controls';
+  const title=document.createElement('h3');title.textContent='Assign feeds to unit beds';section.append(title);
+  const row=document.createElement('div');row.className='organization-row';
+  const preset=makeSelect([['original','Original order'],['duration','Recording duration'],['breaths','Breath-start count'],['manual','Current arrangement']],state.proposal?.sorting.preset||state.organization.sorting.preset);
+  preset.setAttribute('aria-label','Assignment sorting preset');
+  const direction=makeSelect([['asc','Shortest / fewest first'],['desc','Longest / most first']],state.proposal?.sorting.direction||state.organization.sorting.direction);
+  direction.setAttribute('aria-label','Assignment direction');
+  const preview=document.createElement('button');preview.type='button';preview.textContent='Preview assignment';
+  preview.onclick=()=>{
+    try{state.proposal=HospitalSystem.propose(state.model,state.organization,preset.value,direction.value);showBedManager();}
+    catch(error){els.loadStatus.textContent=error.message;}
+  };
+  row.append(preset,direction,preview);section.append(row);
+  const manualRow=document.createElement('div');manualRow.className='organization-row';
+  const feedOptions=state.entries.map(e=>[e.name,e.name]);
+  const feedSelect=makeSelect(feedOptions,feedOptions[0]?.[0]);feedSelect.setAttribute('aria-label','Feed to place manually');
+  const bedOptions=[['','Unassigned'],...state.model.unitDefinitions.flatMap(u=>u.bed_ids.map((id,index)=>[id,`${u.display_name} · Room ${String(index+1).padStart(2,'0')}`]))];
+  const bedSelect=makeSelect(bedOptions,'');bedSelect.setAttribute('aria-label','Destination bed');
+  const manualPreview=document.createElement('button');manualPreview.type='button';manualPreview.textContent='Preview manual placement';
+  manualPreview.onclick=()=>{
+    const placements=structuredClone(state.proposal?.placements||state.organization.placements);
+    const feed=feedSelect.value,target=bedSelect.value;
+    const old=Object.keys(placements).find(id=>placements[id]===feed);
+    if(old)placements[old]=null;
+    const displaced=target?placements[target]:null;
+    if(target)placements[target]=feed;
+    if(displaced&&old&&old!==target)placements[old]=displaced;
+    const assigned=new Set(Object.values(placements).filter(Boolean));
+    const proposal={placements,unassigned:state.model.originalOrder.filter(id=>!assigned.has(id)),
+      missingMetadata:[],sorting:{preset:'manual',direction:'asc'}};
+    const issues=HospitalSystem.validateProposal(proposal,state.model);
+    if(issues.length){els.loadStatus.textContent=issues.join('; ');return;}
+    state.proposal=proposal;showBedManager();
+  };
+  manualRow.append(feedSelect,bedSelect,manualPreview);section.append(manualRow);
+  const counts=HospitalSystem.occupancy(state.organization,state.model);
+  section.append(message(`${state.entries.length-counts.unassigned} assigned · ${counts.unassigned} unassigned · ${state.model.unitDefinitions.length*8} beds available`));
+  section.append(message('Duration is estimated from source sample counts at 50 Hz. Breath sorting uses CSV BS start markers, which can include an incomplete final breath.'));
+  if(state.proposal){
+    const events=HospitalSystem.movementEvents(state.organization,{...state.organization,placements:state.proposal.placements},state.model);
+    section.append(message(`${events.length} placement changes · ${state.proposal.unassigned.length} unassigned · ${state.proposal.missingMetadata.length} with unavailable sorting metadata`));
+    if(state.proposal.missingMetadata.length)section.append(message('Unavailable metadata feeds follow measured feeds, ordered by source filename.','layout-warning'));
+    const listing=document.createElement('details');const summary=document.createElement('summary');summary.textContent='Preview placement changes';listing.append(summary);
+    for(const event of events.slice(0,30))listing.append(message(`${event.feed_id}: ${event.from?.bed_id??'unassigned'} → ${event.to?.bed_id??'unassigned'}`,'proposal-line'));
+    if(events.length>30)listing.append(message(`${events.length-30} more changes`));section.append(listing);
+    const apply=document.createElement('button');apply.type='button';apply.textContent='Apply Assignment';
+    apply.onclick=()=>{try{commitOrganization(HospitalSystem.applyProposal(state.organization,state.proposal,state.model).state);}catch(error){els.loadStatus.textContent=error.message;}};
+    section.append(apply);
+  }
+  const reset=document.createElement('button');reset.type='button';reset.textContent='Reset to Original Layout';
+  reset.onclick=()=>commitOrganization(structuredClone(state.model.baseline));section.append(reset);
+  els.database.append(section);
+}
+function renderHospitalControls(){
+  const section=document.createElement('section');section.className='organization-controls';
+  const title=document.createElement('h3');title.textContent='Manage hospitals and units';section.append(title);
+  const row=document.createElement('div');row.className='organization-row';
+  const name=document.createElement('input');name.placeholder='Hospital name';name.setAttribute('aria-label','New hospital name');
+  const create=document.createElement('button');create.type='button';create.textContent='Create hospital';
+  create.onclick=()=>{try{commitOrganization(HospitalSystem.createHospital(state.organization,name.value));}catch(error){els.loadStatus.textContent=error.message;}};
+  row.append(name,create);section.append(row);
+  const renameRow=document.createElement('div');renameRow.className='organization-row';
+  const hospitals=state.organization.hospitalDefinitions.map(h=>[h.hospital_id,h.display_name]);
+  const hospitalSelect=makeSelect(hospitals,state.managerHospitalId||hospitals[0]?.[0]);
+  const renameInput=document.createElement('input');renameInput.value=state.organization.hospitalDefinitions.find(h=>h.hospital_id===hospitalSelect.value)?.display_name||'';
+  renameInput.setAttribute('aria-label','Hospital display name');
+  hospitalSelect.onchange=()=>{renameInput.value=state.organization.hospitalDefinitions.find(h=>h.hospital_id===hospitalSelect.value)?.display_name||'';};
+  const rename=document.createElement('button');rename.type='button';rename.textContent='Rename';
+  rename.onclick=()=>{try{commitOrganization(HospitalSystem.renameHospital(state.organization,hospitalSelect.value,renameInput.value));}catch(error){els.loadStatus.textContent=error.message;}};
+  renameRow.append(hospitalSelect,renameInput,rename);section.append(renameRow);
+  const moveRow=document.createElement('div');moveRow.className='organization-row';
+  const unitSelect=makeSelect(state.model.unitDefinitions.map(u=>[u.unit_id,u.display_name]),state.model.unitDefinitions[0]?.unit_id);
+  unitSelect.setAttribute('aria-label','Unit to assign');
+  const target=makeSelect([['','Unassigned'],...hospitals],'');target.setAttribute('aria-label','Destination hospital');
+  const floor=makeSelect([['auto','First open floor'],...Array.from({length:HospitalSystem.MAX_UNITS},(_,i)=>
+    [String(i+1),`Floor ${i+1}`])],'auto');floor.setAttribute('aria-label','Destination floor');
+  const move=document.createElement('button');move.type='button';move.textContent='Apply unit assignment';
+  move.onclick=()=>{try{commitOrganization(target.value?
+    floor.value==='auto'?HospitalSystem.assignUnit(state.organization,unitSelect.value,target.value,state.model):
+      HospitalSystem.assignUnitToFloor(state.organization,unitSelect.value,target.value,Number(floor.value),state.model):
+    HospitalSystem.removeUnit(state.organization,unitSelect.value,state.model));}
+    catch(error){els.loadStatus.textContent=error.message;}};
+  moveRow.append(unitSelect,target,floor,move);section.append(moveRow);
+  els.database.append(section);
+}
+function drawMiniPair(canvas,preview,positionSeconds=null){
+  const {ctx,w,h,dpr}=fit(canvas);ctx.clearRect(0,0,w,h);ctx.fillStyle='#0b1d29';ctx.fillRect(0,0,w,h);
+  if(!preview?.flow?.length)return;
+  const live=positionSeconds!==null,n=preview.flow.length,width=Math.min(n,DEFAULT_WINDOW_SECONDS*RATE);
+  const start=live?Math.max(0,Math.min(n-width,Math.floor(positionSeconds*RATE-width*.28))):0;
+  const end=start+width;
+  const rows=[{values:preview.flow,color:'#5bd9de',label:'FLOW',top:8*dpr,bottom:h*.49},{values:preview.pressure,color:'#ffc17b',label:'PRESSURE',top:h*.54,bottom:h-7*dpr}];
+  for(const row of rows){
+    let lo=Infinity,hi=-Infinity;for(let i=start;i<end;i++){const v=row.values[i];if(Number.isFinite(v)){if(v<lo)lo=v;if(v>hi)hi=v;}}
+    if(!Number.isFinite(lo))continue;
+    const span=hi-lo||1;lo-=span*.08;hi+=span*.08;
+    ctx.strokeStyle='#2e4c5b';ctx.lineWidth=dpr;ctx.beginPath();ctx.moveTo(27*dpr,row.bottom);ctx.lineTo(w-5*dpr,row.bottom);ctx.stroke();
+    ctx.fillStyle=row.color;ctx.font=`${9*dpr}px system-ui`;ctx.textAlign='left';ctx.fillText(row.label,4*dpr,row.top+9*dpr);
+    ctx.strokeStyle=row.color;ctx.lineWidth=1.2*dpr;ctx.beginPath();let drawing=false;
+    const step=Math.max(1,Math.floor((end-start)/(w/dpr*2)));
+    for(let i=start;i<end;i+=step){const v=row.values[i];if(!Number.isFinite(v)){drawing=false;continue;}const x=27*dpr+(i-start)/Math.max(1,end-start-1)*(w-34*dpr),y=row.top+(hi-v)/(hi-lo)*(row.bottom-row.top);if(!drawing)ctx.moveTo(x,y);else ctx.lineTo(x,y);drawing=true;}ctx.stroke();
+  }
+  if(live){
+    const sample=Math.min(n-1,Math.floor(positionSeconds*RATE));
+    if(sample>=start&&sample<end){const x=27*dpr+(sample-start)/Math.max(1,end-start-1)*(w-34*dpr);ctx.strokeStyle='#fff2d7';ctx.lineWidth=1.4*dpr;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}
+  }
+}
+function unitPreviewCard(unit,room,entry){
+  const button=document.createElement('button');button.type='button';button.className='unit-preview-card'+(room>6?' shared':entry?'':' empty')+(entry&&feedEnded(entry)?' ended':'');button.disabled=!entry;
+  const strong=document.createElement('strong');strong.textContent=room===7?'Supply room':room===8?'Break room':`Room ${String(room).padStart(2,'0')}`;
+  const small=document.createElement('small');small.textContent=room>6?'Shared unit space':entry?feedEnded(entry)?'Recording complete · open to review or replay':`${clock(entry.samples/RATE)} stream · first 10 s shown`:'Open patient bed';
+  button.append(strong,small);
+  if(entry){const canvas=document.createElement('canvas');canvas.className='mini-pair';canvas._preview=entry.preview;canvas._entry=entry;button.append(canvas);button.onclick=()=>selectEntry(entry);}
+  return button;
+}
+function makeUnitPlayback(unit,members,grid,handoff=null){
+  return {unit,members,grid,data:new Map(),controllers:[],failedSegments:new Set(),
+    elapsed:handoff?.elapsed??sessionSeconds(),resumeActive:handoff?.active??true,
+    resumeFromSession:!handoff,handoffAt:performance.now(),
+    maxSeconds:Math.max(1,...members.map(e=>e.samples/RATE)),
+    active:false,started:false,lastFrame:0,lastDraw:0};
+}
+function renderFloorWaveforms(unitId,level,handoff=null){
+  const section=document.createElement('section');section.className='floor-waveforms';
+  const unit=state.model.unitDefinitions.find(item=>item.unit_id===unitId);
+  const title=document.createElement('h3');
+  title.textContent=`Floor ${level} · ${unit?.display_name||'Open floor'} waveforms`;
+  section.append(title);
+  const grid=document.createElement('div');grid.className='unit-preview-grid';
+  const members=unit?state.units.get(unit.legacy_number):[];
+  for(let room=1;room<=8;room++)grid.append(unitPreviewCard(unit?.legacy_number??null,room,
+    members.find(entry=>entry.room===room)));
+  if(!unit){
+    section.append(message('No unit is assigned to this floor. Six patient beds and two shared rooms remain visible.'),grid);
+    return section;
+  }
+  section.append(message('Each tile starts with a 10-second preview, then shows a live 50 Hz flow and pressure window when its segment is ready. Select a room to open its full waveform view.'));
+  if(members.length){
+    const playback=makeUnitPlayback(unit.legacy_number,members,grid,handoff);
+    state.unitPlayback=playback;
+    els.loadStatus.textContent=`Loading 0/${members.length} feeds…`;
+    section.append(unitTransport(playback));
+    requestAnimationFrame(()=>{
+      if(state.unitPlayback!==playback)return;
+      drawUnitPlayback();loadUnitPlayback(playback);
+    });
+  }
+  section.append(grid);
+  return section;
+}
+function drawUnitPlayback(){
+  const playback=state.unitPlayback;
+  if(!playback)return;
+  playback.time.textContent=`Session ${clock(playback.elapsed)}`;
+  playback.scrub.value=String(Math.round(Math.min(1,playback.elapsed/playback.maxSeconds)*1000));
+  if(!playback.grid.isConnected)return;
+  for(const canvas of playback.grid.querySelectorAll('.mini-pair')){
+    const entry=canvas._entry,data=playback.data.get(entry.name);
+    const position=feedElapsed(entry,playback.elapsed);
+    const card=canvas.closest('.unit-preview-card');
+    card.classList.toggle('ended',position>=entry.samples/RATE);
+    if(position>=entry.samples/RATE)card.querySelector('small').textContent='Recording complete · open to review or replay';
+    if(data){
+      const sample=Math.min(entry.samples-1,Math.floor(position*RATE));
+      const number=segmentNumber(entry,sample),key=`${entry.name}:${number}`;
+      if(!data.loadedSegments.has(number)&&!data.loadingSegments.has(number)&&!playback.failedSegments.has(key)){
+        ensureSegment(entry,data,number).then(()=>{if(state.unitPlayback===playback)drawUnitPlayback();})
+          .catch(error=>{playback.failedSegments.add(key);if(state.unitPlayback===playback){
+            card.classList.add('failed');
+            card.querySelector('small').textContent=`Segment unavailable: ${error.message}`;
+          }});
+      }
+    }
+    drawMiniPair(canvas,data||canvas._preview,data?position:null);
+  }
+}
+function unitTransport(playback){
+  const row=document.createElement('div');row.className='unit-transport';
+  for(const [label,action] of [
+    ['Start',()=>{playback.elapsed=0;playback.active=true;playback.lastFrame=0;drawUnitPlayback();}],
+    ['Play',()=>{playback.active=true;playback.lastFrame=0;}],
+    ['Pause',()=>{playback.active=false;playback.lastFrame=0;drawUnitPlayback();}],
+    ['Stop',()=>{playback.active=false;playback.lastFrame=0;playback.elapsed=0;drawUnitPlayback();}]
+  ]){const button=document.createElement('button');button.type='button';button.textContent=label;button.disabled=true;button.onclick=action;row.append(button);}
+  const speed=document.createElement('span');speed.className='unit-time';speed.textContent='Synchronized · 1×';row.append(speed);
+  playback.scrub=document.createElement('input');playback.scrub.type='range';playback.scrub.min='0';playback.scrub.max='1000';playback.scrub.value='0';playback.scrub.disabled=true;
+  playback.scrub.setAttribute('aria-label','Unit playback position');
+  playback.scrub.oninput=()=>{
+    playback.elapsed=Number(playback.scrub.value)/1000*playback.maxSeconds;
+    playback.lastFrame=0;drawUnitPlayback();
+  };
+  row.append(playback.scrub);
+  playback.time=document.createElement('output');playback.time.className='unit-time';playback.time.textContent=`Session ${clock(playback.elapsed)}`;row.append(playback.time);
+  playback.buttons=[...row.querySelectorAll('button')];return row;
+}
+async function loadUnitPlayback(playback){
+  let completed=0,failures=0;
+  const queue=[...playback.members];
+  async function loadNext(){
+    while(queue.length&&state.unitPlayback===playback){
+    const entry=queue.shift();
+    const card=[...playback.grid.children].find(node=>node.querySelector('canvas')?._entry===entry);
+    try{
+      await state.segmentReady;
+      const data=feedData(entry);
+      const sample=Math.min(entry.samples-1,Math.floor(feedElapsed(entry,playback.elapsed)*RATE));
+      await ensureAt(entry,data,sample);
+      if(state.unitPlayback!==playback)return;
+      playback.data.set(entry.name,data);
+      card.querySelector('small').textContent=feedEnded(entry)?'Recording complete · open to review or replay':`${clock(entry.samples/RATE)} stream · live at 1×`;
+    }catch(err){
+      if(err.name==='AbortError'||state.unitPlayback!==playback)return;
+      failures++;card.classList.add('failed');card.querySelector('small').textContent=`Could not load: ${err.message}`;
+    }finally{
+      if(state.unitPlayback===playback){
+        completed++;
+        if(playback.data.size&&!playback.started){
+          playback.started=true;
+          playback.elapsed=playback.resumeFromSession?sessionSeconds():
+            playback.elapsed+(playback.resumeActive?(performance.now()-playback.handoffAt)/1000:0);
+          playback.active=playback.resumeActive;playback.lastFrame=0;
+          playback.buttons.forEach(button=>button.disabled=false);playback.scrub.disabled=false;
+        }
+        if(playback.grid.isConnected)els.loadStatus.textContent=`${playback.data.size} ready · loading ${completed}/${playback.members.length}${failures?` · ${failures} failed`:''}`;
+        drawUnitPlayback();
+      }
+    }
+    }
+  }
+  await Promise.all(Array.from({length:Math.min(2,playback.members.length)},loadNext));
+  if(state.unitPlayback!==playback)return;
+  if(playback.grid.isConnected)els.loadStatus.textContent=failures?`${playback.data.size} ready · ${failures} failed`:`${playback.data.size} feeds ready`;
+}
+function showUnit(unit){
+  cancelStream();state.selectedNode=state.nodes.find(n=>n.kind==='unit'&&n.unit===unit);focusUnit(unit);
+  const members=state.units.get(unit),samples=members.reduce((sum,e)=>sum+e.samples,0);
+  els.waveform.hidden=true;els.database.hidden=false;updateSpeaker();els.streamLabel.textContent=`UNIT ${String(unit).padStart(2,'0')} NURSING STATION`;
+  els.streamTitle.textContent=`Unit ${String(unit).padStart(2,'0')} · six patient beds`;
+  els.streamMeta.textContent=`${members.length} occupied bed${members.length===1?'':'s'} · ${6-members.length} open bed${6-members.length===1?'':'s'} · supply room · break room · ${samples.toLocaleString()} samples`;
+  els.loadStatus.textContent=members.length?`Loading 0/${members.length} feeds…`:'No feeds in this unit';renderBreadcrumbs(unit);
+  els.database.replaceChildren();
+  const intro=document.createElement('p');intro.className='database-intro';intro.textContent='Occupied rooms follow the page session at 1×. A recording stops at its end and remains available for review or replay. Each tile shows a moving 10-second window of flow and pressure; select a room to inspect it.';
+  const grid=document.createElement('div');grid.className='unit-preview-grid';
+  for(let room=1;room<=8;room++){
+    const entry=members.find(e=>e.room===room);
+    grid.append(unitPreviewCard(unit,room,entry));
+  }
+  const playback=makeUnitPlayback(unit,members,grid);
+  state.unitPlayback=playback;
+  els.database.append(intro,unitTransport(playback),grid);listEntries();drawAtlas();openDetail();
+  requestAnimationFrame(()=>{drawUnitPlayback();loadUnitPlayback(playback);});
+}
+function openVirtualRoom(hospitalId,level,room){
+  const slots=state.organization.floorUnits[hospitalId];
+  const unitId=slots?.[level-1];
+  const feedId=unitId&&Number.isInteger(room)&&room>=1&&room<=HospitalSystem.BEDS_PER_UNIT?
+    state.organization.placements[HospitalSystem.bedId(unitId,room)]:null;
+  const entry=feedId&&state.entries.find(item=>item.name===feedId);
+  if(entry)selectEntry(entry);
+  else showHospital(hospitalId,level,room);
+}
+async function selectEntry(entry) {
+  stopPatientAudio();
+  if(state.selected?.name!==entry.name)
+    roomAxes={flow:WaveformAxis.create(),pressure:WaveformAxis.create(),volume:WaveformAxis.create()};
+  window.RoomLive.pause();
+  const environmentSeconds=feedElapsed(entry);
+  window.RoomLive.selectFeed(entry,environmentSeconds);
+  state.seekGeneration++;
+  if(state.seekTimer){clearTimeout(state.seekTimer);state.seekTimer=null;}
+  const unitPlayback=state.unitPlayback;
+  const unitData=unitPlayback?.data.get(entry.name);
+  const handoffSeconds=environmentSeconds;
+  const handoffPlaying=!feedEnded(entry);
+  stopUnitPlayback();
+  els.speed.value='1';
+  if(state.pending)state.pending.abort();
+  state.active=false;state.lastFrame=0;state.position=handoffSeconds*RATE;state.selected=entry;state.data=null;
+  state.selectedNode=state.nodes.find(n=>n.kind==='room'&&n.entry===entry);focusUnit(entry.unit);
+  els.database.hidden=true;els.waveform.hidden=false;
+  updateSpeaker();
+  renderRoomHeader(entry);
+  renderBreadcrumbs(entry.unit,entry.room);
+  els.loadStatus.textContent='Loading 30-minute segment…'; setControls(false); listEntries(); drawAtlas();openDetail();drawAll();
+  if(state.roomMode==='live'&&!feedEnded(entry))window.RoomLive.start();
+  try {
+    await state.segmentReady;
+    if(state.selected!==entry)return;
+    const data=unitData||feedData(entry);
+    state.data=data;
+    state.position=Math.min(entry.samples-1,handoffSeconds*RATE);
+    await ensureAt(entry,data,state.position);
+    if(state.selected!==entry)return;
+    state.active=state.roomMode==='review'&&handoffPlaying&&state.position<data.flow.length-1;
+    state.lastFrame=0;
+    els.loadStatus.textContent=state.roomMode==='live'?`Real-Time Feed · ${$('room-live-speed').value}×`:
+      `${handoffPlaying?'Ready · playing at 1×':'Recording complete · Replay feed to restart'}${data.bad?` · ${data.bad} unparsed line(s)`:''}`;
+    setControls(true);drawAll();
+  } catch(err) {
+    if(state.selected===entry)els.loadStatus.textContent=`Segment load failed: ${err.message}`;
+  }
+}
+function renderRoomHeader(entry){
+  els.streamLabel.textContent=`STREAM ${String(entry.number).padStart(3,'0')}`;
+  const virtualRoom=fullCatalogByRecording.get(entry.name);
+  els.streamTitle.textContent=virtualRoom?`Hospital ${virtualRoom.hospital_id} · Floor ${virtualRoom.floor} · Room ${String(virtualRoom.room).padStart(2,'0')}`:
+    entry.unit===null?'Unassigned feed':`Unit ${String(entry.unit).padStart(2,'0')} · Room ${String(entry.room).padStart(2,'0')}`;
+  els.streamMeta.textContent=`Source recording ID: ${entry.name.split('-')[0]} · illustrative room assignment`;
+  $('recordingFilename').textContent=entry.name;
+  $('recordingRpi').textContent=String(entry.rpi);
+  $('recordingStart').textContent=entry.shiftedStart;
+  $('recordingSamples').textContent=entry.samples.toLocaleString();
+  $('recordingBreaths').textContent=entry.breaths.toLocaleString();
+}
+function setRoomMode(mode){
+  for(const name of ['review','live']){
+    const button=$(`room-feed-${name}`),selected=name===mode;
+    button.classList.toggle('selected',selected);button.setAttribute('aria-pressed',String(selected));
+  }
+  if(mode===state.roomMode)return;
+  if(mode==='live'){
+    state.reviewWasPlaying=state.active;
+    state.active=false;state.lastFrame=0;
+    state.roomMode='live';els.waveform.dataset.roomMode='live';
+    window.RoomAnalysis.setMode('live');
+    if(state.selected)window.RoomLive.selectFeed(state.selected,feedElapsed(state.selected));
+    window.RoomLive.start();window.RoomLive.draw();
+    els.loadStatus.textContent=`Real-Time Feed · ${$('room-live-speed').value}×`;
+  }else{
+    const joinedSeconds=window.RoomLive.elapsed();
+    window.RoomLive.pause();
+    state.roomMode='review';els.waveform.dataset.roomMode='review';
+    window.RoomAnalysis.setMode('review');
+    state.active=state.reviewWasPlaying&&!!state.data;
+    state.lastFrame=0;
+    els.loadStatus.textContent=`Ready · ${state.active?'playing':'paused'} at ${els.speed.value}×`;
+    if(state.data)setPosition(Math.min(state.data.flow.length-1,joinedSeconds*RATE));
+    else drawAll();
+  }
+  const url=new URL(location.href);
+  if(mode==='review')url.searchParams.set('roomView','review');else url.searchParams.delete('roomView');
+  history.replaceState(null,'',url);
+}
+function setControls(enabled) { for(const el of [els.start,els.play,els.pause,els.stop,els.scrub])el.disabled=!enabled; }
+function setPosition(value,debounce=0) {
+  if(!state.data)return;
+  const generation=++state.seekGeneration;
+  if(state.seekTimer){clearTimeout(state.seekTimer);state.seekTimer=null;}
+  const resume=state.active,entry=state.selected,data=state.data;
+  state.position=Math.max(0,Math.min(state.data.flow.length-1,value));
+  drawAll();
+  if(data.loadedSegments.has(segmentNumber(entry,state.position)))return;
+  state.active=false;state.lastFrame=0;
+  const load=async()=>{
+    els.loadStatus.textContent=`Loading segment at ${clock(state.position/RATE)}…`;
+    try{
+      await ensureAt(entry,data,state.position);
+      if(state.selected===entry&&state.data===data&&state.seekGeneration===generation){
+        state.active=resume;state.lastFrame=0;
+        els.loadStatus.textContent=`Ready · ${state.active?'playing':'paused'} at ${els.speed.value}×${data.bad?` · ${data.bad} unparsed line(s)`:''}`;
+        drawAll();
+      }
+    }catch(error){if(state.selected===entry&&state.seekGeneration===generation)
+      els.loadStatus.textContent=`Segment load failed: ${error.message}`;}
+  };
+  if(debounce)state.seekTimer=setTimeout(load,debounce);else load();
+}
+function drawAll() {
+  if(state.roomMode==='live')return;
+  const data=state.data;
+  if(data){
+    const n=data.flow.length,i=Math.min(n-1,Math.floor(state.position));
+    els.scrub.value=String(Math.round(i/(n-1)*1000));
+    els.time.textContent=`${clock(i/RATE)} / ${clock(n/RATE)}`;
+    const ready=Number.isFinite(data.flow[i])&&Number.isFinite(data.pressure[i]);
+    els.flowValue.textContent=ready?data.flow[i].toFixed(2):'segment loading';
+    els.pressureValue.textContent=ready?data.pressure[i].toFixed(2):'segment loading';
+    els.volumeValue.textContent=Number.isFinite(data.volume[i])?`${data.volume[i].toFixed(1)} mL`:'unavailable';
+    let completed=null;
+    for(const breath of data.completed){
+      if(breath.start>i)break;
+      completed=breath;
+      if(i<breath.end)break;
+    }
+    const value=(v,unit)=>v===null?'unavailable':`${v.toFixed(1)} ${unit}`;
+    els.flowBreathValue.textContent=ready&&completed?
+      `Selected completed source breath · PIFR ${value(completed.pifr,'L/min')} · PEFR ${value(completed.pefr,'L/min')}`:
+      'No completed breath at this position';
+    els.pressureBreathValue.textContent=ready&&completed?
+      `Selected completed source breath · Peak pressure ${value(completed.peakPressure,'cmH₂O')} · PEEP estimate ${value(completed.peep,'cmH₂O')} · MAP (airway) ${value(completed.map,'cmH₂O')}`:
+      'No completed breath at this position';
+    els.breathValue.textContent=ready&&completed?
+      `Selected completed source breath · VTi ${completed.vti.toFixed(1)} mL · VTe ${completed.vte.toFixed(1)} mL · difference ${completed.difference.toFixed(1)} mL`:
+      'No completed breath at this position';
+  } else { els.scrub.value='0';els.time.textContent='0:00.00 / 0:00.00';els.flowValue.textContent='—';els.pressureValue.textContent='—';els.volumeValue.textContent='—';els.flowBreathValue.textContent='No completed breath at this position';els.pressureBreathValue.textContent='No completed breath at this position';els.breathValue.textContent='No completed breath at this position'; }
+  drawOverview();drawSignal(els.flow,0);drawSignal(els.pressure,1);
+  if(document.querySelector('.room-optional').open){
+    if(els.volumeToggle.checked)drawSignal(els.volume,2);
+    drawPath();
+  }
+  window.RoomAnalysis.update({entry:state.selected,data:state.data,position:state.position,
+    bounds:state.data?windowBounds():null},sample=>setPosition(sample));
+}
+function windowBounds() {
+  const n=state.data.flow.length,width=Math.min(n,Number(els.window.value)*RATE);
+  let start=Math.floor(state.position-width*.28);start=Math.max(0,Math.min(n-width,start));
+  return {start,end:start+width};
+}
+function drawOverview() {
+  const {ctx,w,h,dpr}=fit(els.overview);ctx.clearRect(0,0,w,h);ctx.fillStyle='#0c2230';ctx.fillRect(0,0,w,h);
+  if(!state.data)return;
+  const {lo,hi,min,max}=state.data.overview,pad=12*dpr,pw=w-2*pad,span=max-min||1;
+  ctx.strokeStyle='#275060';ctx.beginPath();ctx.moveTo(pad,h/2);ctx.lineTo(w-pad,h/2);ctx.stroke();
+  ctx.strokeStyle='#59d8dc';ctx.lineWidth=Math.max(1,dpr);ctx.beginPath();
+  for(let b=0;b<lo.length;b++){if(!Number.isFinite(lo[b]))continue;const x=pad+b/(lo.length-1)*pw;ctx.moveTo(x,pad+(max-hi[b])/span*(h-2*pad));ctx.lineTo(x,pad+(max-lo[b])/span*(h-2*pad));}ctx.stroke();
+  const bounds=windowBounds(),n=state.data.flow.length;
+  ctx.fillStyle='#a4defb21';ctx.fillRect(pad+bounds.start/n*pw,pad,(bounds.end-bounds.start)/n*pw,h-2*pad);
+  const x=pad+state.position/n*pw;ctx.strokeStyle='#ffc874';ctx.lineWidth=2*dpr;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();
+}
+function drawSignal(canvas,channel) {
+  const {ctx,w,h,dpr}=fit(canvas);ctx.clearRect(0,0,w,h);ctx.fillStyle='#0b1f2a';ctx.fillRect(0,0,w,h);
+  if(!state.data)return;
+  const values=channel===2?state.data.volume:channel===1?state.data.pressure:state.data.flow,{start,end}=windowBounds();
+  const right=12*dpr,top=13*dpr,bottom=25*dpr,ph=h-top-bottom;
+  let min=Infinity,max=-Infinity;for(let i=start;i<end;i++){const v=values[i];if(!Number.isFinite(v))continue;if(v<min)min=v;if(v>max)max=v;}
+  if(!Number.isFinite(min)){ctx.fillStyle='#91adba';ctx.font=`${13*dpr}px system-ui`;ctx.fillText(channel===2?'Calculated volume unavailable in this window':'Segment loading or no valid samples',43*dpr,top+ph/2);return;}
+  ({min,max}=WaveformAxis.observe(roomAxes[channel===2?'volume':channel===1?'pressure':'flow'],min,max));
+  const labels=WaveformAxis.tickLabels(min,max);
+  ctx.font=`${11*dpr}px system-ui`;
+  const left=Math.max(43*dpr,Math.ceil(Math.max(...labels.map(label=>ctx.measureText(label).width)))+10*dpr),pw=w-left-right;
+  ctx.strokeStyle='#294a59';ctx.fillStyle='#91adba';ctx.lineWidth=dpr;ctx.textBaseline='middle';
+  for(let k=0;k<=4;k++){
+    let y=top+k*ph/4;ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(w-right,y);ctx.stroke();
+    ctx.textAlign='right';ctx.fillText(labels[k],left-6*dpr,y);
+  }
+  ctx.textBaseline='alphabetic';
+  for(let k=0;k<=4;k++){const x=left+k*pw/4;ctx.beginPath();ctx.moveTo(x,top);ctx.lineTo(x,top+ph);ctx.stroke();ctx.textAlign='center';ctx.fillText(clock((start+(end-start)*k/4)/RATE),x,top+ph+17*dpr);}
+  const breaths=state.data.breathStarts;ctx.strokeStyle='#43677877';ctx.lineWidth=dpr;
+  for(const b of breaths){if(b<start)continue;if(b>=end)break;const x=left+(b-start)/(end-start)*pw;ctx.beginPath();ctx.moveTo(x,top);ctx.lineTo(x,top+ph);ctx.stroke();}
+  ctx.strokeStyle=channel===2?'#a7e596':channel===1?'#ffc17a':'#5cdae0';ctx.lineWidth=1.5*dpr;ctx.beginPath();
+  const step=Math.max(1,Math.floor((end-start)/(pw/dpr*2)));
+  let drawing=false,previous=-1;
+  for(let i=start;i<end;i+=step){
+    if(!Number.isFinite(values[i])){drawing=false;continue;}
+    const x=left+(i-start)/(end-start-1)*pw,y=top+(max-values[i])/(max-min)*ph;
+    if(!drawing || (channel===2 && state.data.volumeSegment[i]!==state.data.volumeSegment[previous]) || previous>=0 && i-previous>step){ctx.moveTo(x,y);}else ctx.lineTo(x,y);
+    drawing=true;previous=i;
+  }ctx.stroke();
+  const cx=left+(state.position-start)/(end-start)*pw;ctx.strokeStyle='#fff2d7';ctx.lineWidth=2*dpr;ctx.beginPath();ctx.moveTo(cx,top);ctx.lineTo(cx,top+ph);ctx.stroke();
+}
+function drawPath() {
+  const {ctx,w,h,dpr}=fit(els.path);ctx.clearRect(0,0,w,h);ctx.fillStyle='#0b1f2a';ctx.fillRect(0,0,w,h);
+  if(!state.data)return;
+  const {start,end}=windowBounds(),f=state.data.flow,p=els.pathAxis.value==='volume'?state.data.volume:state.data.pressure;
+  let fl=Infinity,fh=-Infinity,pl=Infinity,ph=-Infinity;
+  for(let i=start;i<end;i++){fl=Math.min(fl,f[i]);fh=Math.max(fh,f[i]);if(Number.isFinite(p[i])){pl=Math.min(pl,p[i]);ph=Math.max(ph,p[i]);}}
+  if(!Number.isFinite(pl)){ctx.fillStyle='#91adba';ctx.fillText('Segment loading or no valid path in this window',20*dpr,30*dpr);return;}
+  const coords=(i)=>({x:((i-start)/(end-start-1)-.5)*180,y:((f[i]-fl)/(fh-fl||1)-.5)*155,z:((p[i]-pl)/(ph-pl||1)-.5)*155});
+  const proj=(q)=>project(q,state.pathYaw,state.pathPitch,w,h,1.03);
+  const origin=proj({x:-90,y:-78,z:-78});
+  const zLabel=els.pathAxis.value==='volume'?'VOLUME (mL)':'PRESSURE';
+  for(const [axis,to,color,label] of [['time',{x:95,y:-78,z:-78},'#7abce0','TIME'],['flow',{x:-90,y:85,z:-78},'#5ddce2','FLOW'],['z',{x:-90,y:-78,z:85},'#ffc277',zLabel]]){
+    const tip=proj(to);ctx.strokeStyle=color;ctx.lineWidth=1.3*dpr;ctx.beginPath();ctx.moveTo(origin.x,origin.y);ctx.lineTo(tip.x,tip.y);ctx.stroke();ctx.fillStyle=color;ctx.font=`${11*dpr}px system-ui`;ctx.fillText(label,tip.x+5*dpr,tip.y-4*dpr);
+  }
+  const step=Math.max(1,Math.ceil((end-start)/1500));ctx.lineWidth=1.5*dpr;
+  let prev=null,prevIndex=-1;for(let i=start;i<end;i+=step){if(!Number.isFinite(p[i])){prev=null;continue;}const q=proj(coords(i));if(prev && (els.pathAxis.value!=='volume'||state.data.volumeSegment[i]===state.data.volumeSegment[prevIndex])){ctx.strokeStyle=i<=state.position?'#67dfe3':'#527e98';ctx.beginPath();ctx.moveTo(prev.x,prev.y);ctx.lineTo(q.x,q.y);ctx.stroke();}prev=q;prevIndex=i;}
+  const marker=proj(coords(Math.max(start,Math.min(end-1,Math.floor(state.position)))));
+  if(Number.isFinite(marker.x)&&Number.isFinite(marker.y)){ctx.fillStyle='#ffd17c';ctx.strokeStyle='#fff8e8';ctx.lineWidth=dpr;ctx.beginPath();ctx.arc(marker.x,marker.y,5*dpr,0,Math.PI*2);ctx.fill();ctx.stroke();}
+}
+function frame(now) {
+  if(state.signals&&!document.hidden&&now-(state.lastSceneSignalTime||0)>100){
+    const scene=els.hospitalScene?.contentWindow;
+    const ward=scene?.wardViewer;
+    if(ward && !ward.hospitalView && !ward.expandedHospital){
+      const rooms=[];
+      for(let room=1;room<=6;room++){
+        const assignment=ward.roomAssignment(ward.activeHospital,ward.activeFloor,room);
+        if(!assignment?.uc_davis_recording)continue;
+        const entry=state.entries.find(item=>item.name===assignment.uc_davis_recording);
+        if(!entry)continue;
+        const duration=entry.samples/RATE;
+        const end=feedClock(entry)%duration;
+        const flow=[],pressure=[];
+        for(let index=0;index<50;index++){
+          const sampleTime=((end-5+index/10)%duration+duration)%duration;
+          const sample=signalAt(entry,sampleTime);
+          flow.push(sample?.flow??null);pressure.push(sample?.pressure??null);
+        }
+        rooms.push({id:assignment.id,recording:entry.name,sourceSeconds:end,flow,pressure});
+      }
+      if(rooms.length)scene.postMessage({type:'zebezo-ward-windows',rooms},location.origin);
+    }
+    state.lastSceneSignalTime=now;
+  }
+  if(now-state.clockLastDraw>500){
+    els.sessionClock.textContent=`Session ${clock(sessionSeconds())} · 1×`;
+    refreshHospitalStatuses();
+    state.clockLastDraw=now;
+  }
+  if(!document.hidden&&els.detailOverlay.hidden&&els.directoryOverlay.hidden&&
+      now-state.atlasLastDraw>(compactAtlas()?140:90)){
+    drawAtlas();state.atlasLastDraw=now;
+  }
+  if(state.active && state.data){
+    if(state.lastFrame){const dt=(now-state.lastFrame)/1000;state.position+=dt*RATE*Number(els.speed.value);}
+    state.lastFrame=now;
+    if(state.position>=state.data.flow.length){
+      state.position=state.data.flow.length-1;state.active=false;state.lastFrame=0;
+      els.loadStatus.textContent='Recording complete · Replay feed to restart';
+      drawAll();
+    }
+  }
+  if(state.active && state.data){
+    const entry=state.selected,data=state.data,number=segmentNumber(entry,state.position);
+    if(!data.loadedSegments.has(number)){
+      state.active=false;state.lastFrame=0;els.loadStatus.textContent=`Loading segment at ${clock(state.position/RATE)}…`;
+      const generation=++state.seekGeneration;
+      ensureSegment(entry,data,number).then(()=>{
+        if(state.selected===entry&&state.data===data&&state.seekGeneration===generation){
+          state.active=true;state.lastFrame=0;
+          els.loadStatus.textContent=`Ready · playing at ${els.speed.value}×${data.bad?` · ${data.bad} unparsed line(s)`:''}`;
+          drawAll();
+        }
+      }).catch(error=>{if(state.selected===entry&&state.seekGeneration===generation)
+        els.loadStatus.textContent=`Segment load failed: ${error.message}`;});
+    }else{
+      const next=number+1,boundary=(next)*state.segmentStore.index.segmentSamples;
+      if(next<state.segmentStore.index.feeds[entry.name].segments.length&&
+         boundary-state.position<10*RATE&&!data.loadedSegments.has(next)&&
+         !data.loadingSegments.has(next)&&!data.failedSegments.has(next)){
+        ensureSegment(entry,data,next).catch(error=>{
+          if(state.selected===entry)els.loadStatus.textContent=`Next segment unavailable: ${error.message}`;
+        });
+      }
+      if(!els.waveform.hidden&&!els.detailOverlay.hidden&&now-state.lastDraw>(compactAtlas()?65:30)){drawAll();state.lastDraw=now;}
+    }
+  }
+  const playback=state.unitPlayback;
+  if(playback?.active){
+    if(playback.lastFrame)playback.elapsed+=(now-playback.lastFrame)/1000;
+    playback.lastFrame=now;
+    if(now-playback.lastDraw>(compactAtlas()?120:80)){drawUnitPlayback();playback.lastDraw=now;}
+    if(playback.members.every(entry=>feedElapsed(entry,playback.elapsed)>=entry.samples/RATE)){
+      playback.active=false;playback.lastFrame=0;drawUnitPlayback();
+    }
+  }
+  if(state.voices.size)syncAudio();
+  requestAnimationFrame(frame);
+}
+function pointerX(event,canvas) {const r=canvas.getBoundingClientRect();return event.clientX-r.left;}
+function atlasWorldAt(clientX,clientY){
+  const box=els.atlas.getBoundingClientRect(),dpr=els.atlas.width/box.width;
+  const x=(clientX-box.left)*dpr,y=(clientY-box.top)*dpr;
+  const {top,bottom}=atlasInsets(dpr),centerY=top+(els.atlas.height-top-bottom)/2;
+  const scale=atlasScale(els.atlas.width,els.atlas.height);
+  return {x:state.atlasCenter.x+(x-els.atlas.width/2)/scale,y:state.atlasCenter.y+(y-centerY)/scale};
+}
+function zoomAtlasAt(clientX,clientY,nextZoom,anchor=atlasWorldAt(clientX,clientY)){
+  state.atlasZoom=Math.max(.5,Math.min(8,nextZoom));
+  const box=els.atlas.getBoundingClientRect(),dpr=els.atlas.width/box.width;
+  const x=(clientX-box.left)*dpr,y=(clientY-box.top)*dpr;
+  const {top,bottom}=atlasInsets(dpr),centerY=top+(els.atlas.height-top-bottom)/2;
+  const scale=atlasScale(els.atlas.width,els.atlas.height);
+  state.atlasCenter.x=anchor.x-(x-els.atlas.width/2)/scale;
+  state.atlasCenter.y=anchor.y-(y-centerY)/scale;
+  drawAtlas();
+}
+function atlasHit(event){
+  const box=els.atlas.getBoundingClientRect(),x=(event.clientX-box.left)*els.atlas.width/box.width,y=(event.clientY-box.top)*els.atlas.height/box.height;
+  const dpr=els.atlas.width/box.width;
+  const scale=atlasScale(els.atlas.width,els.atlas.height);
+  for(const p of state.projected.filter(item=>item.node.kind==='hospital')){
+    const half=state.layout.hospitalHalf*scale;
+    const labelWidth=scale>=.5?2*half:Math.max(72*dpr,Math.min(2*half,170*dpr));
+    const labelTop=scale>=.5?p.y-half:p.y-half-20*dpr;
+    const labelBottom=scale>=.5?p.y-half+(6+state.layout.hospitalHeader)*scale:p.y-half;
+    if(Math.abs(x-p.x)<=labelWidth/2&&y>=labelTop&&y<=labelBottom)return p.node;
+  }
+  let nearest=null,best=Infinity,bestPriority=-1;
+  for(const p of state.projected){
+    const side=p.node.kind==='unit'||p.node.kind==='open-floor'?state.layout.unitHalf*2*scale:
+      p.node.kind==='root'?state.layout.rootHalf*2*scale:atlasNodeSide(p.node,scale,dpr);
+    const half=side/2+4*dpr,dx=Math.abs(x-p.x),dy=Math.abs(y-p.y);
+    if((p.node.kind==='unit'||p.node.kind==='open-floor')&&dx<=half&&
+       y>=p.y-state.layout.unitTop*scale-4*dpr&&
+       y<=p.y+state.layout.unitHalf*scale+4*dpr){
+      const priority=2,distance=Math.hypot(dx,dy);
+      if(priority>bestPriority||priority===bestPriority&&distance<best){
+        nearest=p.node;best=distance;bestPriority=priority;
+      }
+      continue;
+    }
+    if(dx>half||dy>half)continue;
+    const distance=Math.hypot(dx,dy);
+    const priority={root:0,hospital:1,unit:2,'open-floor':2,room:3,'open-room':3}[p.node.kind];
+    if(priority>bestPriority||priority===bestPriority&&distance<best){nearest=p.node;best=distance;bestPriority=priority;}
+  }
+  return nearest;
+}
+function setupEvents() {
+  const mobileMenuMedia=matchMedia('(max-width:700px)');
+  let mobileMenuOpen=false,sceneTimeout=null;
+  function setMobileMenu(open,restoreFocus=false){
+    mobileMenuOpen=mobileMenuMedia.matches&&open;
+    els.mobileMenu.classList.toggle('open',mobileMenuOpen);
+    els.mobileMenu.inert=mobileMenuMedia.matches&&!mobileMenuOpen;
+    els.mobileMenu.setAttribute('aria-hidden',String(mobileMenuMedia.matches&&!mobileMenuOpen));
+    els.mobileMenuBackdrop.hidden=!mobileMenuOpen;
+    els.mobileMenuToggle.setAttribute('aria-expanded',String(mobileMenuOpen));
+    if(mobileMenuOpen)els.mobileMenuClose.focus();
+    else if(restoreFocus)els.mobileMenuToggle.focus();
+  }
+  setMobileMenu(false);
+  els.mobileMenuToggle.onclick=()=>setMobileMenu(true);
+  els.mobileMenuClose.onclick=()=>setMobileMenu(false,true);
+  els.mobileMenuBackdrop.onclick=()=>setMobileMenu(false,true);
+  els.mobileMenu.addEventListener('click',event=>{if(event.target.closest('.atlas-buttons button'))setMobileMenu(false);});
+  mobileMenuMedia.addEventListener('change',()=>setMobileMenu(false));
+  function sceneLoading(status,detail=''){
+    clearTimeout(sceneTimeout);
+    if(status==='ready'){els.sceneLoading.hidden=true;return;}
+    els.sceneLoading.hidden=false;
+    els.sceneLoadingTitle.textContent=status==='error'?'Could not load 3D hospitals':status==='slow'?'Still loading 3D hospitals…':'Loading 3D hospitals…';
+    els.sceneLoadingMessage.textContent=detail||'Preparing the hospital scene. Recording transfer progress appears below.';
+    els.retryScene.hidden=status==='loading';
+    if(status==='loading')sceneTimeout=setTimeout(()=>sceneLoading('slow','The scene is taking longer than expected. You can reload it while recording transfers continue.'),20000);
+  }
+  sceneLoading('loading');
+  window.addEventListener('message',event=>{
+    if(event.origin!==location.origin||event.source!==els.hospitalScene.contentWindow)return;
+    if(event.data?.type==='zebezo-scene-status')sceneLoading(event.data.status,event.data.message);
+    if(event.data?.type==='zebezo-open-recording'){
+      const entry=state.entries.find(item=>item.name===event.data.recording);
+      if(entry)selectEntry(entry);
+    }
+  });
+  els.hospitalScene.addEventListener('load',()=>els.hospitalScene.contentWindow?.postMessage({type:'zebezo-scene-action',action:'status'},location.origin));
+  els.hospitalScene.addEventListener('error',()=>sceneLoading('error','The embedded 3D scene did not load.'));
+  els.retryScene.onclick=()=>{
+    sceneLoading('loading');
+    const url=new URL(els.hospitalScene.src);url.searchParams.set('retry',String(Date.now()));els.hospitalScene.src=url.href;
+  };
+  els.flowDirection.onchange=()=>{state.reverseFlow=els.flowDirection.value==='reverse';drawAtlas();};
+  els.muteAll.onclick=muteAll;
+  $('muteAllDetail').onclick=muteAll;
+  els.speaker.onclick=async()=>{
+    const entry=state.selected;if(!entry)return;
+    if(state.voices.has(entry.name))disableVoice(entry.name);
+    else try{await enableVoice(entry);}catch(error){els.loadStatus.textContent=`Audio unavailable: ${error.message}`;}
+  };
+  window.addEventListener('pagehide',()=>{stopPatientAudio();state.audio?.context.close();state.audio=null;});
+  $('openDirectory').onclick=openDirectory;
+  $('openHospitals').onclick=()=>showHospitals();
+  $('openBedManager').onclick=showBedManager;
+  $('viewOnCube').onclick=()=>{if(state.unitPlayback)unitCubes.open(state.unitPlayback.unit);};
+  els.retrySegments.onclick=()=>{
+    const names=state.segmentStore?.stats().failures.map(item=>item.name)||[];
+    if(names.length){els.retrySegments.disabled=true;state.segmentStore.warmFirst(names)
+      .finally(()=>{els.retrySegments.disabled=false;});}
+  };
+  $('closeDirectory').onclick=closeDirectory;
+  $('closeDetail').onclick=closeDetails;
+  els.directoryOverlay.addEventListener('pointerdown',e=>{if(e.target===els.directoryOverlay)closeDirectory();});
+  els.detailOverlay.addEventListener('pointerdown',e=>{if(e.target===els.detailOverlay)closeDetails();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(unitCubes.grid.windows.size)unitCubes.grid.closeAll();else if(!$('unitCubeOverlay').hidden)unitCubes.close();else if(!els.detailOverlay.hidden)closeDetails();else if(!els.directoryOverlay.hidden)closeDirectory();else if(mobileMenuOpen)setMobileMenu(false,true);}});
+  window.addEventListener('resize',()=>{if(state.unitPlayback)drawUnitPlayback();else document.querySelectorAll('.mini-pair').forEach(canvas=>drawMiniPair(canvas,canvas._preview));});
+  els.search.addEventListener('input',()=>{state.filter=els.search.value.trim().toLowerCase();listEntries();drawAtlas();});
+  const sceneAction=action=>document.getElementById('hospitalScene')?.contentWindow?.postMessage({type:'zebezo-scene-action',action},location.origin);
+  $('resetAtlas').onclick=()=>{state.atlasCenter={x:0,y:0};state.atlasZoom=defaultAtlasZoom();drawAtlas();sceneAction('reset');};
+  const zoomButton=(factor)=>{
+    const box=els.atlas.getBoundingClientRect();
+    zoomAtlasAt(box.left+box.width/2,box.top+box.height/2,state.atlasZoom*factor);
+  };
+  $('zoomIn').onclick=()=>{zoomButton(1.35);sceneAction('zoom-in');};
+  $('zoomOut').onclick=()=>{zoomButton(1/1.35);sceneAction('zoom-out');};
+  els.atlas.addEventListener('pointerdown',e=>{
+    els.atlas.setPointerCapture(e.pointerId);
+    state.atlasPointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(state.atlasPointers.size===1){
+      state.atlasDrag={id:e.pointerId,x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,moved:false};
+    }else if(state.atlasPointers.size===2){
+      const [a,b]=[...state.atlasPointers.values()],midX=(a.x+b.x)/2,midY=(a.y+b.y)/2;
+      state.atlasPinch={distance:Math.max(1,Math.hypot(a.x-b.x,a.y-b.y)),zoom:state.atlasZoom,
+        anchor:atlasWorldAt(midX,midY)};
+      state.atlasDrag=null;
+    }
+  });
+  els.atlas.addEventListener('pointermove',e=>{
+    if(state.atlasPointers.has(e.pointerId)){
+      state.atlasPointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    }
+    if(state.atlasPinch&&state.atlasPointers.size>=2){
+      const [a,b]=[...state.atlasPointers.values()],midX=(a.x+b.x)/2,midY=(a.y+b.y)/2;
+      const distance=Math.max(1,Math.hypot(a.x-b.x,a.y-b.y));
+      zoomAtlasAt(midX,midY,state.atlasPinch.zoom*distance/state.atlasPinch.distance,state.atlasPinch.anchor);
+      return;
+    }
+    if(state.atlasDrag?.id===e.pointerId){
+      const drag=state.atlasDrag,dx=e.clientX-drag.x,dy=e.clientY-drag.y;
+      if(Math.hypot(e.clientX-drag.startX,e.clientY-drag.startY)>7)drag.moved=true;
+      const scale=atlasScale(els.atlas.width,els.atlas.height),dpr=els.atlas.width/els.atlas.clientWidth;
+      state.atlasCenter.x-=dx*dpr/scale;state.atlasCenter.y-=dy*dpr/scale;
+      drag.x=e.clientX;drag.y=e.clientY;drawAtlas();return;
+    }
+    if(e.pointerType!=='mouse')return;
+    const hit=atlasHit(e);
+    if(hit!==state.hover){state.hover=hit;els.atlasStatus.textContent=hit?.kind==='room'?`Unit ${hit.unit} · Room ${hit.room}`:
+      hit?.kind==='unit'?`Unit ${hit.unit} nursing station`:
+      hit?.kind==='open-floor'||hit?.kind==='open-room'?`Floor ${hit.floor_level} · Open`:
+      hit?.kind==='hospital'?hit.label:hit?'Hospital database':'';drawAtlas();}
+  });
+  els.atlas.addEventListener('pointerup',e=>{
+    const tapped=state.atlasPointers.size===1&&state.atlasDrag?.id===e.pointerId&&!state.atlasDrag.moved;
+    state.atlasPointers.delete(e.pointerId);
+    if(state.atlasPointers.size===1){
+      const [id,point]=[...state.atlasPointers.entries()][0];
+      state.atlasDrag={id,x:point.x,y:point.y,startX:point.x,startY:point.y,moved:true};
+    }else state.atlasDrag=null;
+    state.atlasPinch=null;
+    if(tapped){
+      const hit=atlasHit(e);
+      if(hit){
+        e.preventDefault();
+        setTimeout(()=>{
+          if(hit.kind==='root')showHospitals();
+          else if(hit.kind==='hospital')hit.hospital_id?showHospital(hit.hospital_id):showUnassignedUnits(hit.unit_ids);
+          else if(hit.kind==='unit')showUnit(hit.unit);
+          else if(hit.kind==='open-floor'||hit.kind==='open-room')showHospital(hit.hospital_id,hit.floor_level);
+          else if(hit.entry)selectEntry(hit.entry);
+          else if(hit.kind==='room')showUnit(hit.unit);
+        },0);
+      }
+    }
+  });
+  els.atlas.addEventListener('pointercancel',e=>{
+    state.atlasPointers.delete(e.pointerId);state.atlasPinch=null;state.atlasDrag=null;
+  });
+  els.atlas.addEventListener('pointerleave',()=>{if(!state.atlasDrag){state.hover=null;els.atlasStatus.textContent='';drawAtlas();}});
+  els.atlas.addEventListener('wheel',e=>{e.preventDefault();zoomAtlasAt(e.clientX,e.clientY,state.atlasZoom*(e.deltaY<0?1.15:.87));},{passive:false});
+  els.start.onclick=()=>{setPosition(0);state.active=true;state.lastFrame=0;};
+  els.play.onclick=()=>{if(state.data&&state.position<state.data.flow.length-1){state.active=true;state.lastFrame=0;}};
+  els.pause.onclick=()=>{state.seekGeneration++;state.active=false;state.lastFrame=0;drawAll();};
+  els.stop.onclick=()=>{state.seekGeneration++;state.active=false;state.lastFrame=0;setPosition(0);};
+  $('room-replay-feed').onclick=()=>{
+    if(!state.selected)return;
+    replayFeed(state.selected);
+    window.RoomLive.selectFeed(state.selected,0);
+    setRoomMode('live');
+    window.RoomLive.start();
+  };
+  els.scrub.addEventListener('input',()=>{if(state.data){state.lastFrame=0;setPosition(Number(els.scrub.value)/1000*(state.data.flow.length-1),150);}});
+  els.window.addEventListener('change',drawAll);
+  $('room-feed-review').addEventListener('click',()=>setRoomMode('review'));
+  $('room-feed-live').addEventListener('click',()=>setRoomMode('live'));
+  document.querySelector('.room-optional').addEventListener('toggle',drawAll);
+  els.volumeToggle.addEventListener('change',()=>{els.volumeCard.hidden=!els.volumeToggle.checked;drawAll();});
+  els.pathAxis.addEventListener('change',()=>{els.pathLabel.textContent=els.pathAxis.value==='volume'?'time · flow · calculated volume':'time · flow · pressure';drawPath();});
+  els.overview.addEventListener('pointerdown',e=>{if(!state.data)return;els.overview.setPointerCapture(e.pointerId);const ratio=Math.max(0,Math.min(1,pointerX(e,els.overview)/els.overview.clientWidth));setPosition(ratio*(state.data.flow.length-1),150);});
+  els.overview.addEventListener('pointermove',e=>{if(e.buttons!==1||!state.data)return;const ratio=Math.max(0,Math.min(1,pointerX(e,els.overview)/els.overview.clientWidth));setPosition(ratio*(state.data.flow.length-1),150);});
+  els.path.addEventListener('pointerdown',e=>{els.path.setPointerCapture(e.pointerId);state.pathDrag={x:e.clientX,y:e.clientY};});
+  els.path.addEventListener('pointermove',e=>{if(!state.pathDrag)return;state.pathYaw+=(e.clientX-state.pathDrag.x)*.008;state.pathPitch=Math.max(-1.4,Math.min(1.4,state.pathPitch+(e.clientY-state.pathDrag.y)*.008));state.pathDrag={x:e.clientX,y:e.clientY};drawPath();});
+  els.path.addEventListener('pointerup',()=>{state.pathDrag=null;});
+  new ResizeObserver(()=>{drawAtlas();drawAll();}).observe(document.querySelector('main'));
+}
+async function init() {
+  els.window.value=String(DEFAULT_WINDOW_SECONDS);
+  mountRoomAxisControls();
+  window.RoomAnalysis.mount(sample=>setPosition(sample),()=>windowBounds());
+  window.RoomLive.mount({ready:()=>state.segmentReady,data:feedData,replay:replayFeed,advance:advanceFeed,
+    ensure:(entry,data,sample)=>ensureAt(entry,data,sample),
+    segment:(entry,sample)=>state.segmentStore.segment(entry.name,segmentNumber(entry,sample)),
+    sequence:name=>breathSequenceMap?.[name],analyze:analyzeBrowser});
+  unitCubes=new UnitCubes($('unitCubeOverlay'),{
+    gridRoot:$('gridMonitor'),sessionSeconds,feedElapsed,replayFeed,
+    unitNumbers:()=>state.model.unitDefinitions.map(unit=>unit.legacy_number),
+    unitEntries:number=>state.units.get(number)||[],allEntries:()=>state.entries,
+    loadRoom:async(entry,sample)=>{
+      await state.segmentReady;
+      const data=feedData(entry);
+      await ensureAt(entry,data,Math.max(0,Math.min(entry.samples-1,sample)));
+      return data;
+    },
+    ensureRoom:(entry,data,sample)=>ensureAt(entry,data,sample),
+    hasRoomSample:(entry,data,sample)=>data.loadedSegments.has(segmentNumber(entry,sample)),
+    openSingle:entry=>selectEntry(entry),
+    onClose:()=>$('viewOnCube').focus()
+  });
+  setupEvents();
+  fetch('breath-sequence.json').then(response=>{
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  }).then(map=>{
+    breathSequenceMap=map;
+    window.RoomAnalysis.setSequenceMap(map);
+    for(const entry of state.entries)if(map[entry.name])entry.breaths=map[entry.name].length;
+    if(state.selected)renderRoomHeader(state.selected);
+    drawAll();
+  })
+    .catch(error=>{console.warn('Breath sequence index unavailable:',error);});
+  setRoomMode(new URLSearchParams(location.search).get('roomView')==='review'?'review':'live');
+  try {
+    const response=await fetch('manifest.json');if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    const manifest=await response.json();state.entries=manifest.entries;
+    const campusResponse=await fetch('scene3d/campus_manifest_full_catalog.json');
+    if(!campusResponse.ok)throw new Error(`Full campus registry HTTP ${campusResponse.status}`);
+    const campus=await campusResponse.json();
+    fullCatalogByRecording=new Map(campus.rooms.filter(room=>room.uc_davis_recording).map(room=>[room.uc_davis_recording,room]));
+    if(fullCatalogByRecording.size!==state.entries.length || state.entries.some(entry=>!fullCatalogByRecording.has(entry.name)))
+      throw new Error('Full campus registry does not cover every UC Davis recording');
+    if(breathSequenceMap)for(const entry of state.entries)
+      if(breathSequenceMap[entry.name])entry.breaths=breathSequenceMap[entry.name].length;
+    state.model=HospitalSystem.createModel(state.entries,manifest.sampleRate);
+    let saved=null;
+    try{saved=localStorage.getItem(LAYOUT_KEY)??LEGACY_LAYOUT_KEYS.map(key=>localStorage.getItem(key)).find(value=>value!==null)??null;}
+    catch(error){state.layoutIssues=[`Browser storage unavailable: ${error.message}`];}
+    const restored=HospitalSystem.loadState(saved,state.model);
+    state.organization=restored.state;state.layoutIssues.push(...restored.issues);
+    if(saved!==null&&restored.migrated)saveOrganization();
+    projectPlacements();
+    els.datasetStats.textContent=`${state.entries.length} UC Davis feeds · 24 MGH feeds · 5 hospitals · 180 rooms`;
+    state.atlasZoom=defaultAtlasZoom();
+    showHospitals(false);requestAnimationFrame(frame);
+    function openRoute(){
+      if(location.hash.startsWith('#cube=')){
+        const unit=Number(new URLSearchParams(location.hash.slice(1)).get('cube'));
+        if(Number.isInteger(unit)&&state.units.has(unit)){showUnit(unit);unitCubes.open(unit);}
+        return;
+      }
+      if(location.hash.startsWith('#unit=')){
+        const unit=Number(new URLSearchParams(location.hash.slice(1)).get('unit'));
+        if(Number.isInteger(unit)&&state.units.has(unit))showUnit(unit);
+        return;
+      }
+      if(!location.hash.startsWith('#hospital='))return;
+      const route=new URLSearchParams(location.hash.slice(1));
+      const hospitalId=route.get('hospital'),level=Number(route.get('floor')),room=Number(route.get('room'));
+      if(state.organization.hospitalDefinitions.some(item=>item.hospital_id===hospitalId)){
+        const validLevel=Number.isInteger(level)&&level>=1&&level<=4?level:null;
+        const validRoom=Number.isInteger(room)&&room>=1&&room<=8?room:null;
+        if(route.get('view')==='feed'&&validLevel&&validRoom)openVirtualRoom(hospitalId,validLevel,validRoom);
+        else showHospital(hospitalId,validLevel,validRoom);
+      }
+    }
+    loadAtlasSignals();
+    state.segmentReady=(async()=>{
+      try{
+        const indexResponse=await fetch('segment-index.json?v=20261008-segments1');
+        if(!indexResponse.ok)throw new Error(`Index HTTP ${indexResponse.status}`);
+        const index=await indexResponse.json();
+        if(!LOCAL_ROOM_PREVIEW&&!RECORDING_BASE.includes(index.sourceRevision))throw new Error('Segment index source revision differs from recording URL');
+        let renderPending=false,latest=null;
+        const onProgress=stats=>{
+          latest=stats;if(renderPending)return;renderPending=true;
+          requestAnimationFrame(()=>{renderPending=false;renderSegmentProgress(latest);});
+        };
+        state.segmentStore=SegmentStore.create(index,state.entries,RECORDING_BASE,{onProgress});
+        renderSegmentProgress(state.segmentStore.stats());
+        setTimeout(()=>state.segmentStore.warmFirst().catch(error=>{
+          els.segmentProgressText.textContent=`Background transfer stopped: ${error.message}`;
+        }),0);
+        return state.segmentStore;
+      }catch(error){els.segmentProgressText.textContent=`Segment loading unavailable: ${error.message}`;throw error;}
+    })();
+    // The atlas stays usable if the index is unavailable; room views await the
+    // original rejecting promise and report the same error when selected.
+    state.segmentReady.catch(()=>{});
+    openRoute();window.addEventListener('hashchange',openRoute);
+  } catch(err) {els.datasetStats.textContent=`Could not load manifest: ${err.message}. Open through the local HTTP server.`;}
+}
+init();

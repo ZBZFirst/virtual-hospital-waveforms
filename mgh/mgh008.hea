@@ -1,0 +1,37 @@
+mgh008 8 360/0.476 1323908
+mgh008.dat 212 1251(23)/mV 12 0 -704 44557 0 ECG lead I
+mgh008.dat 212 1216(-376)/mV 12 0 -815 5513 0 ECG lead II
+mgh008.dat 212 1235(-338)/mV 12 0 -412 28509 0 ECG lead V
+mgh008.dat 212 12.13(-1403)/mmHg 12 0 -1370 41652 0 ART
+mgh008.dat 212 20.56(-1100)/mmHg 12 0 -1195 20616 0 PAP
+mgh008.dat 212 20.1(-1103)/mmHg 12 0 -1120 49540 0 CVP
+mgh008.dat 212 1000 12 0 -641 50511 0 Resp. Imp.
+mgh008.dat 212 1000 12 0 -83 60672 0 CO2
+#<age>: 71 <sex>: F <diagnoses>: Colon resection; Prosthetic valve; Endocarditis
+# PERTINENT HISTORY:
+#   Aortic stenosis and regurgitation
+#   Slight tricuspid regurgitation
+#   s/p mitral valve replacement
+# ELECTROCARDIOGRAPHIC DATA:
+# UNDERLYING RHYTHM:
+#   Atrial fibrillation with ventricular demand pacing @ 80 bpm
+# PACEMAKER DATA:
+#   Permanent ventricular demand pacing (VVI)
+#   Unipolar wire
+#   Specifics unavailable
+# ECG INTERPRETATION:
+#   minor nonspecific ST segment and T wave abnormalities
+# HEMODYNAMIC DATA:
+#   ART: 100/60   	MEAN: 70
+#   PAP: 34/16   	PCW: 14 (@ 9 min, 16 min, 21 min, 30 min, 33 min)
+#   RAP: 10
+# WAVEFORM PATTERNS:
+#   "V waves" in PCW due to reduced atrial compliance with atrial hypertropy
+#   "V waves" in CVP due to tricuspid regurgitation
+#   Retrograde V wave spikes in the PA trace
+#   Intermittent "overwedge" configuration is noted in PCW @ 30 min
+#   Respiratory variation
+# RESPIRATORY DATA:
+# RATE:   16 bpm
+# MODE OF VENTILATION:
+#   Spontaneous

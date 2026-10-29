@@ -1,0 +1,37 @@
+mgh004 8 360/0.476 1029692
+mgh004.dat 212 1317(-509)/mV 12 0 -1260 51706 0 ECG lead I
+mgh004.dat 212 1225(-964)/mV 12 0 -1487 42762 0 ECG lead II
+mgh004.dat 212 1254(-198)/mV 12 0 -486 22798 0 ECG lead V
+mgh004.dat 212 11.98(-1213)/mmHg 12 0 -1388 25201 0 ART
+mgh004.dat 212 19.24(-990)/mmHg 12 0 -1399 49090 0 PAP
+mgh004.dat 212 19.94(-999)/mmHg 12 0 -1453 58704 0 CVP
+mgh004.dat 212 1000 12 0 -733 60084 0 Resp. Imp.
+mgh004.dat 212 1000 12 0 -74 63011 0 CO2
+#<age>: 64 <sex>: F <diagnoses>: Acute cholecystitis; Cholecystectomy
+# GENERAL COMMENTS:
+#   Short recording due to unexpected patient transfer
+# ELECTROCARDIOGRAPHIC DATA:
+# UNDERLYING RHYTHM:
+#   Normal sinus rhythm @ 68 bpm
+# RHYTHM DISTURBANCES:
+#   A trial ectopy
+#   Premature junctional beats
+#   Unifocal junctional ectopy
+# ECG INTERPRETATION:
+#   Low ECG voltage
+#   Left atrial enlargement
+#   Poor R wave progression; ? old antero-septal infarct
+#   Non-specific ST segment and T wave abnormalities
+# HEMODYNAMIC DATA:
+#   ART: 140/50
+#   PAP: 32/16   	PCW: 12 (@ 13 min)
+#   RAP: 5
+# WAVEFORM PATTERNS:
+#   Pulsus paradox
+#   Respiratory variation
+#   "Catheter whip" in PA trace with spiking in the PCW
+#   Enlarged "a wave" in RA trace
+# RESPIRATORY DATA:
+# RATE:   18 bpm
+# MODE OF VENTILATION:
+#   Spontaneous
