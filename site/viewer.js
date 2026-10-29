@@ -411,7 +411,8 @@ function bytesLabel(bytes){return `${(bytes/1048576).toFixed(1)} MiB`;}
 function renderSegmentProgress(stats){
   els.segmentProgressBar.max=stats.totalBytes||1;
   els.segmentProgressBar.value=stats.verifiedBytes;
-  els.segmentProgressText.textContent=`First 30-minute ranges: ${bytesLabel(stats.firstBytesReceived)} received / ${bytesLabel(stats.totalBytes)} expected · ${stats.ready}/${stats.total} feeds ready · ${stats.failed} failed`;
+  els.segmentProgressBar.hidden=stats.firstBytesReceived===0;
+  els.segmentProgressText.textContent=`Full-resolution recordings load on demand · ${stats.ready}/${stats.total} initial ranges cached · ${bytesLabel(stats.firstBytesReceived)} transferred · ${stats.failed} failed`;
   els.segmentFailures.hidden=!stats.failed;els.retrySegments.hidden=!stats.failed;
   els.segmentFailureList.replaceChildren(...stats.failures.map(failure=>{
     const item=document.createElement('li');item.textContent=`${failure.name}: ${failure.error}`;return item;
@@ -1745,9 +1746,6 @@ async function init() {
         };
         state.segmentStore=SegmentStore.create(index,state.entries,RECORDING_BASE,{onProgress});
         renderSegmentProgress(state.segmentStore.stats());
-        setTimeout(()=>state.segmentStore.warmFirst().catch(error=>{
-          els.segmentProgressText.textContent=`Background transfer stopped: ${error.message}`;
-        }),0);
         return state.segmentStore;
       }catch(error){els.segmentProgressText.textContent=`Segment loading unavailable: ${error.message}`;throw error;}
     })();
@@ -1757,4 +1755,68 @@ async function init() {
     openRoute();window.addEventListener('hashchange',openRoute);
   } catch(err) {els.datasetStats.textContent=`Could not load manifest: ${err.message}. Open through the local HTTP server.`;}
 }
+function setupStreamerMode(){
+  const panel=$('streamerWindow'),video=$('streamerVideo'),toggle=$('streamerToggle');
+  const status=$('streamerStatus'),retry=$('streamerRetry'),mirror=$('streamerMirror');
+  const handle=$('streamerDragHandle');
+  let stream=null,generation=0,drag=null;
+  function stopCamera(){
+    generation++;
+    if(stream){for(const track of stream.getTracks())track.stop();stream=null;}
+    video.srcObject=null;
+  }
+  function close(){
+    stopCamera();panel.hidden=true;retry.hidden=true;
+    toggle.textContent='Streamer mode';toggle.setAttribute('aria-pressed','false');
+    status.textContent='Camera is off';
+  }
+  async function open(){
+    if(!panel.hidden && stream)return;
+    panel.hidden=false;toggle.textContent='Stop streamer mode';toggle.setAttribute('aria-pressed','true');
+    status.textContent='Requesting camera…';retry.hidden=true;
+    const request=++generation;
+    try{
+      if(!navigator.mediaDevices?.getUserMedia)throw new Error('Camera access requires HTTPS or localhost.');
+      const acquired=await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+      if(request!==generation){for(const track of acquired.getTracks())track.stop();return;}
+      stream=acquired;video.srcObject=stream;
+      await video.play();
+      status.textContent='Camera active · drag title to move · resize corner';
+    }catch(error){
+      if(request!==generation)return;
+      stopCamera();
+      status.textContent=error.name==='NotAllowedError'?'Camera permission was denied.':
+        error.name==='NotFoundError'?'No webcam was found.':error.message||'Could not start camera.';
+      retry.hidden=false;
+    }
+  }
+  toggle.addEventListener('click',()=>{
+    if(panel.hidden)open();else close();
+  });
+  $('streamerClose').addEventListener('click',close);
+  retry.addEventListener('click',open);
+  mirror.addEventListener('click',()=>{
+    const unmirrored=video.classList.toggle('unmirrored');
+    mirror.textContent=unmirrored?'Mirror off':'Mirror on';
+    mirror.setAttribute('aria-pressed',String(!unmirrored));
+  });
+  handle.addEventListener('pointerdown',event=>{
+    if(event.target.closest('button'))return;
+    const rect=panel.getBoundingClientRect();
+    drag={id:event.pointerId,x:event.clientX,y:event.clientY,left:rect.left,top:rect.top};
+    panel.style.left=`${rect.left}px`;panel.style.top=`${rect.top}px`;panel.style.right='auto';
+    handle.setPointerCapture(event.pointerId);panel.classList.add('is-dragging');
+  });
+  handle.addEventListener('pointermove',event=>{
+    if(!drag||event.pointerId!==drag.id)return;
+    const left=Math.max(0,Math.min(innerWidth-panel.offsetWidth,drag.left+event.clientX-drag.x));
+    const top=Math.max(0,Math.min(innerHeight-panel.offsetHeight,drag.top+event.clientY-drag.y));
+    panel.style.left=`${left}px`;panel.style.top=`${top}px`;
+  });
+  function endDrag(event){if(drag?.id===event.pointerId){drag=null;panel.classList.remove('is-dragging');}}
+  handle.addEventListener('pointerup',endDrag);
+  handle.addEventListener('pointercancel',endDrag);
+  addEventListener('pagehide',stopCamera);
+}
+setupStreamerMode();
 init();
