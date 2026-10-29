@@ -20,7 +20,8 @@ establish unique patient identity or clinical correspondence between datasets.
 ## Sources and rights
 
 - UC Davis ventilator recordings: https://zenodo.org/records/14884306 .
-  Preserve the citation and license terms shown by the source record.
+  The source archive is GPL-3.0-or-later; see `site/DATA-LICENSE.txt` and
+  preserve the paper citation shown by the source record.
 - PhysioNet MGH/MF Waveform Database v1.0.0:
   https://physionet.org/content/mghdb/1.0.0/ . Source files are published
   under Open Data Commons Attribution License v1.0; retain this attribution.
