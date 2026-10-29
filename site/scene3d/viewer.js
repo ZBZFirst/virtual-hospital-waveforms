@@ -103,6 +103,8 @@ let renderScale = 1, performanceWindowStart = performance.now(), performanceFram
 const floorHeight = 3.2;
 const recordings = new Map();
 let telemetryBase = '';
+let modelBase = '';
+const modelUrl = path => new URL(path, modelBase).href;
 let telemetryDetail = null, lastDetailPaint = 0;
 const playbackStart = performance.now();
 let telemetryReady = Array(6).fill(false);
@@ -133,7 +135,7 @@ const recordClock = (record, elapsed) => Math.floor((elapsed + (record.startSeco
 function showError(message) {
   errorBox.textContent = message;
   errorBox.style.display = 'block';
-  status.textContent = 'Export test error';
+  status.textContent = 'Hospital scene error';
   console.error(message);
 }
 
@@ -698,7 +700,7 @@ function rigChestCover(patient, room) {
 
 function ensureHighPatient() {
   if (highModel || highLoading) return;
-  highLoading = modelLoader.loadAsync('./patient_lods/patient_001_lod0.glb').then(gltf => {
+  highLoading = modelLoader.loadAsync(modelUrl('patient_lods/patient_001_lod0.glb')).then(gltf => {
     highModel = gltf.scene;
     highModel.visible = false;
     highModel.traverse(o => {
@@ -1026,7 +1028,13 @@ async function expandHospital(hospitalId) {
   const site=new THREE.Vector3(hospital.position_x_m,0,hospital.position_z_m);
   focus(new THREE.Vector3(site.x,9.5,site.z),new THREE.Vector3(site.x+25,site.y+37,site.z+57));
   status.textContent=`Hospital ${hospitalId} · preparing six floors…`;
-  try { await Promise.all(Array.from({length:6},(_,index)=>ensureFloor(hospitalId,index+1))); }
+  try {
+    for(let first=1;first<=6;first+=2){
+      status.textContent=`Hospital ${hospitalId} · loading floors ${first}–${first+1} of 6…`;
+      await Promise.all([ensureFloor(hospitalId,first),ensureFloor(hospitalId,first+1)]);
+      if(token!==floorSelectToken)return;
+    }
+  }
   catch(error){if(token===floorSelectToken)showError(`Hospital ${hospitalId} load failed: ${error}`);return;}
   if(token!==floorSelectToken || activeHospital!==hospitalId)return;
   const building=hospitalShell.children.find(item=>item.userData.hospitalId===hospitalId);
@@ -1752,11 +1760,11 @@ animate();
 
 let sharedPatientAssets = null;
 function loadFloorTemplate(level) {
-  if(!floorTemplates.has(level))floorTemplates.set(level,modelLoader.loadAsync(`./${meta.floors[level-1].file}`).catch(error=>{floorTemplates.delete(level);throw error;}));
+  if(!floorTemplates.has(level))floorTemplates.set(level,modelLoader.loadAsync(modelUrl(meta.floors[level-1].file)).catch(error=>{floorTemplates.delete(level);throw error;}));
   return floorTemplates.get(level);
 }
 function loadRoofTemplate(level) {
-  if(!roofTemplates.has(level))roofTemplates.set(level,modelLoader.loadAsync(`./${meta.floors[level-1].roof.file}`).catch(error=>{roofTemplates.delete(level);throw error;}));
+  if(!roofTemplates.has(level))roofTemplates.set(level,modelLoader.loadAsync(modelUrl(meta.floors[level-1].roof.file)).catch(error=>{roofTemplates.delete(level);throw error;}));
   return roofTemplates.get(level);
 }
 async function ensureFloor(hospitalId, level) {
@@ -1766,8 +1774,8 @@ async function ensureFloor(hospitalId, level) {
   const promise = (async () => {
     const hasPatient=campusManifest.rooms.some(room=>room.hospital_id===hospitalId&&room.floor===level&&room.patient_id);
     if(hasPatient)sharedPatientAssets ??= Promise.all([
-      modelLoader.loadAsync('./patient_lods/patient_001_lod2.glb'),
-      modelLoader.loadAsync('./patient_lods/patient_001_lod1.glb'),
+      modelLoader.loadAsync(modelUrl('patient_lods/patient_001_lod2.glb')),
+      modelLoader.loadAsync(modelUrl('patient_lods/patient_001_lod1.glb')),
     ]).catch(error=>{sharedPatientAssets=null;throw error;});
     const [floorAsset,roofAsset,patientAssets] = await Promise.all([
       loadFloorTemplate(level),
@@ -1889,9 +1897,10 @@ async function boot() {
     fetch('./camera_tour.json').then(r => r.json()),
     fetch('./six_room_rolling_waveform_excerpts.json').then(r => r.json()),
     fetch('./campus_manifest_full_catalog.json').then(r=>r.json()),
-    fetch('./catalog_config.json').then(r=>r.json()),
+    fetch('./catalog_config.json?v=20261029-github-models').then(r=>r.json()),
   ]);
   telemetryBase = new URL(catalogConfig.mgh_base,location.href).href;
+  modelBase = new URL(catalogConfig.model_base || './',location.href).href;
   if(campusManifest.hospitals.length!==5 || campusManifest.rooms.length!==180 || new Set(campusManifest.rooms.map(r=>r.id)).size!==180)
     throw Error('Full catalog must define five hospitals and 180 unique room IDs');
   roomById=new Map(campusManifest.rooms.map(room=>[room.id,room]));
@@ -1914,8 +1923,8 @@ async function boot() {
   const loader = new GLTFLoader();
   modelLoader = loader;
   const [elevatorAsset, shellAsset] = await Promise.all([
-    loader.loadAsync('./elevator_cab.glb'),
-    loader.loadAsync(`./${meta.hospital_shell.file}`),
+    loader.loadAsync(modelUrl('elevator_cab.glb')),
+    loader.loadAsync(modelUrl(meta.hospital_shell.file)),
   ]);
   hospitalShell=new THREE.Group();
   hospitalShell.name='Five hospital campus';
