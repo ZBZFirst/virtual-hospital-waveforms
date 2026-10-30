@@ -45,16 +45,8 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.1);
 sun.position.set(15, 35, 19);
 scene.add(sun);
 
-let manifest, meta, campusManifest, roomById = new Map(), floors = [], activeFloor = 1, activeRoom = 0, activeHospital = 'A', grandCube = null;
-let floorManifestReady = null;
+let meta, campusManifest, roomById = new Map(), floors = [], activeFloor = 1, activeRoom = 0, activeHospital = 'A', grandCube = null;
 let cameraTourReady = null;
-function loadFloorManifest(){
-  floorManifestReady ??= fetch('./full_telemetry_manifest_v22.json').then(response=>{
-    if(!response.ok)throw Error(`Telemetry manifest HTTP ${response.status}`);
-    return response.json();
-  }).then(value=>{manifest=value;return value;}).catch(error=>{floorManifestReady=null;throw error;});
-  return floorManifestReady;
-}
 function loadCameraTour(){
   cameraTourReady ??= fetch('./camera_tour.json').then(response=>{
     if(!response.ok)throw Error(`Camera tour HTTP ${response.status}`);

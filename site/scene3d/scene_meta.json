@@ -1,12 +1,13 @@
 {
   "source": "zebezo_unit_19_six_floor_full_telemetry_v22.blend",
   "floor_height_m": 3.2,
+  "shared_floor_template_level": 2,
   "floors": [
     {
       "level": 1,
       "collection": "FLOOR 01 | original ward assets",
-      "file": "ward_floor.glb",
-      "selected_objects": 860,
+      "file": "ward_floor_02.glb",
+      "selected_objects": 794,
       "bounds_blender_xyz_m": {
         "min": [
           -17.100000381469727,
@@ -21,7 +22,7 @@
       },
       "roof": {
         "collection": "Architecture | roof - toggle for exterior",
-        "file": "roof_floor_01.glb",
+        "file": "roof_floor_02.glb",
         "selected_objects": 1,
         "bounds_blender_xyz_m": {
           "min": [
@@ -75,7 +76,7 @@
     {
       "level": 3,
       "collection": "FLOOR 03 | linked ward assets",
-      "file": "ward_floor_03.glb",
+      "file": "ward_floor_02.glb",
       "selected_objects": 794,
       "bounds_blender_xyz_m": {
         "min": [
@@ -91,7 +92,7 @@
       },
       "roof": {
         "collection": "Floor 03 | Architecture | roof - toggle for exterior",
-        "file": "roof_floor_03.glb",
+        "file": "roof_floor_02.glb",
         "selected_objects": 1,
         "bounds_blender_xyz_m": {
           "min": [
@@ -110,7 +111,7 @@
     {
       "level": 4,
       "collection": "FLOOR 04 | linked ward assets",
-      "file": "ward_floor_04.glb",
+      "file": "ward_floor_02.glb",
       "selected_objects": 794,
       "bounds_blender_xyz_m": {
         "min": [
@@ -126,7 +127,7 @@
       },
       "roof": {
         "collection": "Floor 04 | Architecture | roof - toggle for exterior",
-        "file": "roof_floor_04.glb",
+        "file": "roof_floor_02.glb",
         "selected_objects": 1,
         "bounds_blender_xyz_m": {
           "min": [
@@ -145,7 +146,7 @@
     {
       "level": 5,
       "collection": "FLOOR 05 | linked ward assets",
-      "file": "ward_floor_05.glb",
+      "file": "ward_floor_02.glb",
       "selected_objects": 794,
       "bounds_blender_xyz_m": {
         "min": [
@@ -161,7 +162,7 @@
       },
       "roof": {
         "collection": "Floor 05 | Architecture | roof - toggle for exterior",
-        "file": "roof_floor_05.glb",
+        "file": "roof_floor_02.glb",
         "selected_objects": 1,
         "bounds_blender_xyz_m": {
           "min": [
@@ -180,7 +181,7 @@
     {
       "level": 6,
       "collection": "FLOOR 06 | linked ward assets",
-      "file": "ward_floor_06.glb",
+      "file": "ward_floor_02.glb",
       "selected_objects": 794,
       "bounds_blender_xyz_m": {
         "min": [
@@ -196,7 +197,7 @@
       },
       "roof": {
         "collection": "Floor 06 | Architecture | roof - toggle for exterior",
-        "file": "roof_floor_06.glb",
+        "file": "roof_floor_02.glb",
         "selected_objects": 1,
         "bounds_blender_xyz_m": {
           "min": [

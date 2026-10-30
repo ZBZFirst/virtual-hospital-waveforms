@@ -1,5 +1,6 @@
 let sharedPatientAssets = null;
 let simulationSignTexture = null;
+const sharedFloorMeta=()=>meta.floors[meta.shared_floor_template_level-1];
 function makeSimulationRoomSign() {
   if(!simulationSignTexture){
     const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=256;
@@ -42,23 +43,24 @@ function configureRoomEquipment(bedRig, overlay, assignment, room) {
     telemetryRoot.position.copy(bedRig.position).add(corner);
   }
 }
-function loadFloorTemplate(level) {
-  if(!floorTemplates.has(level))floorTemplates.set(level,loadTrackedModel(meta.floors[level-1].file).catch(error=>{floorTemplates.delete(level);throw error;}));
-  return floorTemplates.get(level);
+function loadFloorTemplate() {
+  const path=sharedFloorMeta().file;
+  if(!floorTemplates.has(path))floorTemplates.set(path,loadTrackedModel(path).catch(error=>{floorTemplates.delete(path);throw error;}));
+  return floorTemplates.get(path);
 }
-function loadRoofTemplate(level) {
-  if(!roofTemplates.has(level))roofTemplates.set(level,loadTrackedModel(meta.floors[level-1].roof.file).catch(error=>{roofTemplates.delete(level);throw error;}));
-  return roofTemplates.get(level);
+function loadRoofTemplate() {
+  const path=sharedFloorMeta().roof.file;
+  if(!roofTemplates.has(path))roofTemplates.set(path,loadTrackedModel(path).catch(error=>{roofTemplates.delete(path);throw error;}));
+  return roofTemplates.get(path);
 }
 function floorModelPaths(hospitalId, level) {
-  const floor = meta.floors[level-1];
+  const floor = sharedFloorMeta();
   const paths = [floor.file, floor.roof.file];
   if(campusManifest.rooms.some(room=>room.hospital_id===hospitalId&&room.floor===level&&room.patient_id))
     paths.push('patient_lods/patient_001_lod2.glb','patient_lods/patient_001_lod1.glb');
   return paths;
 }
 async function ensureFloor(hospitalId, level) {
-  await loadFloorManifest();
   const state=hospitalStates.get(hospitalId), key=`${hospitalId}:${level}`;
   if (state.floors[level-1]) return state.floors[level-1];
   if (floorLoads.has(key)) return floorLoads.get(key);
@@ -69,26 +71,30 @@ async function ensureFloor(hospitalId, level) {
       loadTrackedModel('patient_lods/patient_001_lod1.glb'),
     ]).catch(error=>{sharedPatientAssets=null;throw error;});
     const [floorAsset,roofAsset,patientAssets] = await Promise.all([
-      loadFloorTemplate(level),
-      loadRoofTemplate(level),
+      loadFloorTemplate(),
+      loadRoofTemplate(),
       hasPatient?sharedPatientAssets:Promise.resolve(null),
     ]);
     const [lowPatientAsset,patientAsset] = patientAssets || [];
-    const sourceLevel=level;
-    const group = floorAsset.scene.clone(true);
+    const sourceLevel=meta.shared_floor_template_level;
+    const group = new THREE.Group();
+    const floorGeometry=floorAsset.scene.clone(true);
+    floorGeometry.position.y=(level-sourceLevel)*floorHeight;
+    group.add(floorGeometry);
     group.name=`Hospital_${hospitalId}_floor_${level}`;
     group.visible = false;
     scene.add(group);
     // The GLB also contains Blender's static trace meshes. The browser canvas
     // is the sole waveform layer, so these must not sit over its live image.
     group.traverse(o => {
-      if (o.isMesh && /^Room_\d+_rolling_(pressure|flow|calculated_volume)/i.test(o.name)) o.visible = false;
+      if (o.isMesh && /(?:_trace|_rolling_(pressure|flow|calculated_volume))$/i.test(o.name)) o.visible = false;
     });
     let hinge = null;
     group.traverse(o => { if (o.name.includes('Elevator_door_hinge')) hinge = o; });
     if (!hinge) throw Error(`Floor ${level}: elevator landing hinge missing`);
     state.doorHinges[level-1] = { object: hinge, base: hinge.quaternion.clone() };
     const roof = roofAsset.scene.clone(true);
+    roof.position.y=(level-sourceLevel)*floorHeight;
     roof.traverse(o=>{if(o.isMesh)o.material=new THREE.MeshBasicMaterial({color:0xc8d3d7,side:THREE.DoubleSide})});
     roof.visible = false;
     scene.add(roof);
@@ -112,11 +118,7 @@ async function ensureFloor(hospitalId, level) {
         group.traverse(object=>{if(new RegExp(`^Room_${pad}_(?:circuit|breathing_circuit)`, 'i').test(object.name))object.visible=false;});
         patients.push(null);
       }
-      else if(level===1){
-        const patient=group.getObjectByName(`Patient_${String(room).padStart(3,'0')}`);
-        if(!patient)throw Error(`Floor ${level} room ${room}: patient missing`);
-        patients.push(patient);
-      }else{
+      else{
         const source=patientAsset.scene.getObjectByName('Patient_001');
         if(!source)throw Error('Standalone LOD1 patient missing');
         const clone=source.clone(true);
@@ -133,9 +135,9 @@ async function ensureFloor(hospitalId, level) {
         setPatientAirwayVisible(proxy,Boolean(assignment.uc_davis_recording));
         proxy.visible=false;bedRig.add(proxy);proxies.push(proxy);
       }else proxies.push(null);
-      const entry = manifest.rooms.find(e => e.floor === level && e.room === room);
-      const overlayName = `F${String(sourceLevel).padStart(2, '0')}_R${pad}_${entry.record.toUpperCase()}_full-feed_screen_overlay`;
-      const overlay = group.getObjectByName(overlayName);
+      let overlay=null;
+      const overlayPattern=new RegExp(`^F${String(sourceLevel).padStart(2,'0')}_R${pad}_.*_full-feed_screen_overlay$`,'i');
+      group.traverse(object=>{if(object.isMesh && overlayPattern.test(object.name))overlay=object;});
       if (!overlay?.isMesh) throw Error(`Floor ${level} room ${room}: telemetry overlay missing from GLB`);
       configureRoomEquipment(bedRig,overlay,assignment,room);
       const screen = makeScreen(room);

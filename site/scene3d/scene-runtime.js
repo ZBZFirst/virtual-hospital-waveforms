@@ -48,16 +48,8 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.1);
 sun.position.set(15, 35, 19);
 scene.add(sun);
 
-let manifest, meta, campusManifest, roomById = new Map(), floors = [], activeFloor = 1, activeRoom = 0, activeHospital = 'A', grandCube = null;
-let floorManifestReady = null;
+let meta, campusManifest, roomById = new Map(), floors = [], activeFloor = 1, activeRoom = 0, activeHospital = 'A', grandCube = null;
 let cameraTourReady = null;
-function loadFloorManifest(){
-  floorManifestReady ??= fetch('./full_telemetry_manifest_v22.json').then(response=>{
-    if(!response.ok)throw Error(`Telemetry manifest HTTP ${response.status}`);
-    return response.json();
-  }).then(value=>{manifest=value;return value;}).catch(error=>{floorManifestReady=null;throw error;});
-  return floorManifestReady;
-}
 function loadCameraTour(){
   cameraTourReady ??= fetch('./camera_tour.json').then(response=>{
     if(!response.ok)throw Error(`Camera tour HTTP ${response.status}`);
@@ -184,7 +176,7 @@ addEventListener('resize', resize);
 resize();
 
 // Source: scene3d/parts/model-sizes.js
-const modelBytes = Object.freeze({"elevator_cab.glb":17400,"hospital_shell.glb":138124,"patient_lods/patient_001_lod1.glb":1034948,"patient_lods/patient_001_lod2.glb":129096,"roof_floor_01.glb":6540,"roof_floor_02.glb":6548,"roof_floor_03.glb":6564,"roof_floor_04.glb":6564,"roof_floor_05.glb":6564,"roof_floor_06.glb":6564,"ward_floor.glb":7432940,"ward_floor_02.glb":3482640,"ward_floor_03.glb":3482560,"ward_floor_04.glb":3482512,"ward_floor_05.glb":4863588,"ward_floor_06.glb":4863308});
+const modelBytes = Object.freeze({"elevator_cab.glb":17400,"hospital_shell.glb":138124,"patient_lods/patient_001_lod1.glb":1034948,"patient_lods/patient_001_lod2.glb":129096,"roof_floor_02.glb":6548,"ward_floor_02.glb":3482640});
 
 // Source: scene3d/parts/load-progress.js
 // Model byte sizes are generated with the release, so the bar includes assets
@@ -1462,12 +1454,97 @@ function drawVitalOverview(detail,record) {
   c.strokeStyle='#fff0c7';c.lineWidth=2;c.beginPath();c.moveTo(marker,0);c.lineTo(marker,h);c.stroke();
 }
 
+// Source: scene3d/parts/floor-reveal.js
+// The six lightweight plans establish the complete layout before the shared GLB arrives.
+const floorPreviews=new Map(),floorReveals=new Map();
+const floorRevealOrder=[4,5,6,1,2,3];
+function expandedFloorPosition(level,site){
+  const column=(level-1)%3,row=Math.floor((level-1)/3);
+  return new THREE.Vector3(site.x+(column-1)*38,0,site.z+(row-.5)*42);
+}
+function makeFloorPreview(level,site){
+  if(floorPreviews.has(level))return floorPreviews.get(level);
+  const group=new THREE.Group(),y=(level-1)*floorHeight;
+  const slabMaterial=new THREE.MeshBasicMaterial({color:0x6f8f99,transparent:true,opacity:.35,depthWrite:false,side:THREE.DoubleSide});
+  const roomMaterial=new THREE.MeshBasicMaterial({color:0xa8c6cc,transparent:true,opacity:.55,depthWrite:false,wireframe:true});
+  const slab=new THREE.Mesh(new THREE.BoxGeometry(34.2,.15,24.2),slabMaterial);
+  slab.position.y=y-.08;group.add(slab);
+  const roomGeometry=new THREE.BoxGeometry(9,.15,6.6);
+  for(const [x,z] of [[-10,-7],[0,-7],[10,-7],[-10,7],[0,7],[10,7]]){
+    const room=new THREE.Mesh(roomGeometry,roomMaterial);
+    room.position.set(x,y+.08,z);group.add(room);
+  }
+  const badge=makeFloorBadge(level);badge.visible=true;group.add(badge);
+  group.position.copy(expandedFloorPosition(level,site));
+  scene.add(group);
+  const preview={group,materials:new Map([[slabMaterial,slabMaterial.opacity],[roomMaterial,roomMaterial.opacity],
+    [badge.material,badge.material.opacity]])};
+  floorPreviews.set(level,preview);
+  return preview;
+}
+function removeFloorPreview(level){
+  const preview=floorPreviews.get(level);if(!preview)return;
+  scene.remove(preview.group);
+  const geometries=new Set(),materials=new Set(),textures=new Set();
+  preview.group.traverse(object=>{
+    if(object.geometry)geometries.add(object.geometry);
+    for(const material of Array.isArray(object.material)?object.material:[object.material]){
+      if(!material)continue;materials.add(material);if(material.map)textures.add(material.map);
+    }
+  });
+  for(const geometry of geometries)geometry.dispose();
+  for(const material of materials)material.dispose();
+  for(const texture of textures)texture.dispose();
+  floorPreviews.delete(level);
+}
+function finishFloorReveal(level){
+  const reveal=floorReveals.get(level);if(!reveal)return;
+  for(const binding of reveal.bindings)binding.object.material=binding.original;
+  for(const material of reveal.copies)material.dispose();
+  floorReveals.delete(level);removeFloorPreview(level);
+}
+function clearFloorReveals(){
+  for(const level of [...floorReveals.keys()])finishFloorReveal(level);
+  for(const level of [...floorPreviews.keys()])removeFloorPreview(level);
+}
+function revealFloor(level,floor,site){
+  finishFloorReveal(level);
+  const copies=new Map(),bindings=[];
+  const copyMaterial=material=>{
+    if(!copies.has(material)){
+      const clone=material.clone();clone.transparent=true;clone.depthWrite=false;clone.opacity=0;
+      clone.needsUpdate=true;copies.set(material,clone);
+    }
+    return copies.get(material);
+  };
+  floor.group.traverse(object=>{
+    if(!object.material)return;
+    const original=object.material;
+    object.material=Array.isArray(original)?original.map(copyMaterial):copyMaterial(original);
+    bindings.push({object,original});
+  });
+  floor.group.position.copy(expandedFloorPosition(level,site));
+  floor.group.visible=true;floor.roof.visible=false;floor.badge.visible=true;
+  floor.patients.forEach((patient,room)=>{if(patient){patient.visible=false;floor.proxies[room].visible=true;}});
+  floorReveals.set(level,{start:performance.now(),duration:650,bindings,copies:[...copies.values()],originals:copies});
+}
+function tickFloorReveals(now){
+  for(const [level,reveal] of floorReveals){
+    const t=Math.min(1,(now-reveal.start)/reveal.duration),smooth=t*t*(3-2*t);
+    for(const [original,copy] of reveal.originals)copy.opacity=original.opacity*smooth;
+    const preview=floorPreviews.get(level);
+    if(preview)for(const [material,opacity] of preview.materials)material.opacity=opacity*(1-smooth);
+    if(t===1)finishFloorReveal(level);
+  }
+}
+
 // Source: scene3d/parts/navigation.js
 function focus(target, position) {
   cameraMove = { from: camera.position.clone(), fromTarget: controls.target.clone(), to: position, toTarget: target, start: performance.now(), duration: 950 };
 }
 
 function resetExpandedView(selectedLevel = null) {
+  clearFloorReveals();
   if(expansion?.materials)for(const [material,old] of expansion.materials){
     material.opacity=old.opacity;material.transparent=old.transparent;material.depthWrite=old.depthWrite;material.needsUpdate=true;
   }
@@ -1508,12 +1585,6 @@ async function expandHospital(hospitalId) {
   const hospital=campusManifest.hospitals.find(item=>item.id===hospitalId);
   const site=new THREE.Vector3(hospital.position_x_m,0,hospital.position_z_m);
   focus(new THREE.Vector3(site.x,9.5,site.z),new THREE.Vector3(site.x+25,site.y+37,site.z+57));
-  status.textContent=`Hospital ${hospitalId} · loading first floor…`;
-  const loadToken=hospitalStates.get(hospitalId).floors[0]?null:
-    beginModelLoad('floor',`Loading Hospital ${hospitalId}, Floor 1`,floorModelPaths(hospitalId,1));
-  try { await ensureFloor(hospitalId,1); }
-  catch(error){if(loadToken)finishModelLoad(loadToken);if(token===floorSelectToken)showError(`Hospital ${hospitalId} load failed: ${error}`);return;}
-  if(token!==floorSelectToken || activeHospital!==hospitalId){if(loadToken)finishModelLoad(loadToken);return;}
   const building=hospitalShell.children.find(item=>item.userData.hospitalId===hospitalId);
   hospitalShell.children.forEach(item=>item.visible=item===building);
   hospitalView=false;expandedHospital=true;
@@ -1523,11 +1594,9 @@ async function expandHospital(hospitalId) {
   document.querySelector('#hospitalView').setAttribute('aria-pressed','false');
   document.querySelectorAll('[data-floor]').forEach(button=>button.classList.remove('active'));
   floors.forEach((floor,index)=>{
-    if(!floor)return;
-    floor.group.position.set(site.x,index*floorHeight,site.z);
-    floor.group.visible=true;
-    floor.roof.visible=false;
-    floor.badge.visible=false;
+    if(!floor){makeFloorPreview(index+1,site);return;}
+    floor.group.position.copy(expandedFloorPosition(index+1,site));
+    floor.group.visible=true;floor.roof.visible=false;floor.badge.visible=true;
     floor.patients.forEach((patient,room)=>{if(patient){patient.visible=false;floor.proxies[room].visible=true;}});
   });
   const materials=new Map();
@@ -1535,32 +1604,39 @@ async function expandHospital(hospitalId) {
     for(const material of Array.isArray(object.material)?object.material:[object.material])
       if(material && !materials.has(material))materials.set(material,{opacity:material.opacity,transparent:material.transparent,depthWrite:material.depthWrite});
   }});
-  expansion={building,materials,site,start:performance.now(),duration:1850,finished:false};
+  expansion={building,materials,site,start:performance.now(),duration:950,finished:false};
   camera.fov=camera.aspect<0.8?72:53;camera.updateProjectionMatrix();
   const expandedEye=camera.aspect<0.8
     ? new THREE.Vector3(site.x,site.y+135,site.z+175)
     : new THREE.Vector3(site.x+12,site.y+65,site.z+92);
   focus(new THREE.Vector3(site.x,1.2,site.z),expandedEye);
   updateRoofs();
-  status.textContent=`Hospital ${hospitalId} · first floor ready · choose any floor`;
+  status.textContent=`Hospital ${hospitalId} · six floor positions ready · loading room details`;
   reportSceneLocation('expanded');
-  if(loadToken)finishModelLoad(loadToken);
-  setTimeout(async()=>{
-    for(let level=2;level<=6;level++){
-      if(token!==floorSelectToken || activeHospital!==hospitalId || !expandedHospital)return;
-      try {
-        const floor=await ensureFloor(hospitalId,level);
-        if(token!==floorSelectToken || activeHospital!==hospitalId || !expandedHospital)return;
-        const column=(level-1)%3,row=Math.floor((level-1)/3);
-        floor.group.position.set(site.x+(column-1)*38,0,site.z+(row-.5)*42);
-        floor.group.visible=true;
-        floor.roof.visible=false;
-        floor.badge.visible=true;
-        floor.patients.forEach((patient,room)=>{if(patient){patient.visible=false;floor.proxies[room].visible=true;}});
-        status.textContent=`Hospital ${hospitalId} · ${level} of 6 floors ready · choose any floor`;
-      } catch(error){showError(`Hospital ${hospitalId} floor ${level} load failed: ${error}`);return;}
-    }
-  },2000);
+  fillExpandedFloorDetails(hospitalId,site,token).catch(error=>showError(`Hospital ${hospitalId} floor loading failed: ${error}`));
+}
+
+async function fillExpandedFloorDetails(hospitalId,site,token){
+  const firstMissing=floorRevealOrder.find(level=>!floors[level-1]);
+  const paths=firstMissing?floorModelPaths(hospitalId,firstMissing):[];
+  const loadToken=paths.some(path=>!modelTransfers.get(path)?.complete)?
+    beginModelLoad('floor','Loading shared floor layout',paths):null;
+  let ready=6-floorPreviews.size;
+  for(const level of floorRevealOrder){
+    if(token!==floorSelectToken || activeHospital!==hospitalId || !expandedHospital)break;
+    if(floors[level-1])continue;
+    let floor;
+    try{floor=await ensureFloor(hospitalId,level);}
+    catch(error){if(loadToken)finishModelLoad(loadToken);if(token===floorSelectToken)showError(`Hospital ${hospitalId} floor ${level} load failed: ${error}`);return;}
+    if(loadToken)finishModelLoad(loadToken);
+    if(token!==floorSelectToken || activeHospital!==hospitalId || !expandedHospital)break;
+    revealFloor(level,floor,site);
+    ready++;
+    status.textContent=`Hospital ${hospitalId} · ${ready} of 6 detailed floors ready`;
+    await new Promise(resolve=>requestAnimationFrame(resolve));
+  }
+  if(token===floorSelectToken && activeHospital===hospitalId && expandedHospital)
+    status.textContent=`Hospital ${hospitalId} · six floors ready · choose any floor`;
 }
 
 function leaveHospitalView() {
@@ -1729,8 +1805,9 @@ async function setFloor(number, moveCamera = true) {
   const hospitalId=activeHospital;
   requestedFloor=number;
   status.textContent=`Loading hospital ${hospitalId}, floor ${number}…`;
-  const loadToken=hospitalStates.get(hospitalId).floors[number-1]?null:
-    beginModelLoad('floor',`Loading Hospital ${hospitalId}, Floor ${number}`,floorModelPaths(hospitalId,number));
+  const paths=hospitalStates.get(hospitalId).floors[number-1]?[]:floorModelPaths(hospitalId,number);
+  const loadToken=paths.some(path=>!modelTransfers.get(path)?.complete)?
+    beginModelLoad('floor',`Loading Hospital ${hospitalId}, Floor ${number}`,paths):null;
   try { await ensureFloor(hospitalId,number); }
   catch(err) { if(loadToken)finishModelLoad(loadToken);if(token===floorSelectToken){requestedFloor=null;showError(`Floor ${number} load failed: ${err}`);} return; }
   if(token!==floorSelectToken || hospitalId!==activeHospital){if(loadToken)finishModelLoad(loadToken);return;}
@@ -2218,9 +2295,13 @@ renderer.domElement.addEventListener('click',event=>{
   campusRaycaster.setFromCamera(pointer,camera);
   if(expandedHospital){
     if(!expansion?.finished)return;
-    for(const hit of campusRaycaster.intersectObjects(floors.filter(Boolean).map(floor=>floor.group),true)){
-      const index=floors.findIndex(floor=>{if(!floor)return false;let node=hit.object;while(node){if(node===floor.group)return true;node=node.parent;}return false;});
-      if(index>=0){setFloor(index+1);break;}
+    const targets=[...floors.filter(Boolean).map(floor=>floor.group),...[...floorPreviews.values()].map(preview=>preview.group)];
+    for(const hit of campusRaycaster.intersectObjects(targets,true)){
+      const belongsTo=group=>{let node=hit.object;while(node){if(node===group)return true;node=node.parent;}return false;};
+      const index=floors.findIndex(floor=>floor&&belongsTo(floor.group));
+      const preview=[...floorPreviews.entries()].find(([,item])=>belongsTo(item.group));
+      const level=index>=0?index+1:preview?.[0];
+      if(level){setFloor(level);break;}
     }
     return;
   }
@@ -2281,20 +2362,15 @@ function animate() {
   lastFrameTime = now;
   if(expansion && !expansion.finished){
     const t=Math.min(1,(now-expansion.start)/expansion.duration);
-    const smooth=t*t*(3-2*t),{site,building,materials}=expansion;
+    const smooth=t*t*(3-2*t),{building,materials}=expansion;
     if(!expansion.materialsPrepared){
       for(const material of materials.keys()){material.transparent=true;material.depthWrite=false;material.needsUpdate=true;}
       expansion.materialsPrepared=true;
     }
-    floors.forEach((floor,index)=>{
-      if(!floor)return;
-      const column=index%3,row=Math.floor(index/3);
-      floor.group.position.set(site.x+(column-1)*38*smooth,index*floorHeight*(1-smooth),site.z+(row-.5)*42*smooth);
-      floor.badge.visible=t>0.5;
-    });
     for(const material of materials.keys())material.opacity=Math.max(0,1-smooth*1.12);
-    if(t===1){building.visible=false;expansion.finished=true;status.textContent=`Hospital ${activeHospital} · six floors expanded · select a floor`;}
+    if(t===1){building.visible=false;expansion.finished=true;}
   }
+  tickFloorReveals(now);
   if(floorReturnMove){
     const t=Math.min(1,(now-floorReturnMove.start)/floorReturnMove.duration),smooth=t*t*(3-2*t);
     floorReturnMove.group.position.copy(floorReturnMove.from).multiplyScalar(1-smooth);
@@ -2387,6 +2463,7 @@ animate();
 // Source: scene3d/parts/floor-loader.js
 let sharedPatientAssets = null;
 let simulationSignTexture = null;
+const sharedFloorMeta=()=>meta.floors[meta.shared_floor_template_level-1];
 function makeSimulationRoomSign() {
   if(!simulationSignTexture){
     const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=256;
@@ -2429,23 +2506,24 @@ function configureRoomEquipment(bedRig, overlay, assignment, room) {
     telemetryRoot.position.copy(bedRig.position).add(corner);
   }
 }
-function loadFloorTemplate(level) {
-  if(!floorTemplates.has(level))floorTemplates.set(level,loadTrackedModel(meta.floors[level-1].file).catch(error=>{floorTemplates.delete(level);throw error;}));
-  return floorTemplates.get(level);
+function loadFloorTemplate() {
+  const path=sharedFloorMeta().file;
+  if(!floorTemplates.has(path))floorTemplates.set(path,loadTrackedModel(path).catch(error=>{floorTemplates.delete(path);throw error;}));
+  return floorTemplates.get(path);
 }
-function loadRoofTemplate(level) {
-  if(!roofTemplates.has(level))roofTemplates.set(level,loadTrackedModel(meta.floors[level-1].roof.file).catch(error=>{roofTemplates.delete(level);throw error;}));
-  return roofTemplates.get(level);
+function loadRoofTemplate() {
+  const path=sharedFloorMeta().roof.file;
+  if(!roofTemplates.has(path))roofTemplates.set(path,loadTrackedModel(path).catch(error=>{roofTemplates.delete(path);throw error;}));
+  return roofTemplates.get(path);
 }
 function floorModelPaths(hospitalId, level) {
-  const floor = meta.floors[level-1];
+  const floor = sharedFloorMeta();
   const paths = [floor.file, floor.roof.file];
   if(campusManifest.rooms.some(room=>room.hospital_id===hospitalId&&room.floor===level&&room.patient_id))
     paths.push('patient_lods/patient_001_lod2.glb','patient_lods/patient_001_lod1.glb');
   return paths;
 }
 async function ensureFloor(hospitalId, level) {
-  await loadFloorManifest();
   const state=hospitalStates.get(hospitalId), key=`${hospitalId}:${level}`;
   if (state.floors[level-1]) return state.floors[level-1];
   if (floorLoads.has(key)) return floorLoads.get(key);
@@ -2456,26 +2534,30 @@ async function ensureFloor(hospitalId, level) {
       loadTrackedModel('patient_lods/patient_001_lod1.glb'),
     ]).catch(error=>{sharedPatientAssets=null;throw error;});
     const [floorAsset,roofAsset,patientAssets] = await Promise.all([
-      loadFloorTemplate(level),
-      loadRoofTemplate(level),
+      loadFloorTemplate(),
+      loadRoofTemplate(),
       hasPatient?sharedPatientAssets:Promise.resolve(null),
     ]);
     const [lowPatientAsset,patientAsset] = patientAssets || [];
-    const sourceLevel=level;
-    const group = floorAsset.scene.clone(true);
+    const sourceLevel=meta.shared_floor_template_level;
+    const group = new THREE.Group();
+    const floorGeometry=floorAsset.scene.clone(true);
+    floorGeometry.position.y=(level-sourceLevel)*floorHeight;
+    group.add(floorGeometry);
     group.name=`Hospital_${hospitalId}_floor_${level}`;
     group.visible = false;
     scene.add(group);
     // The GLB also contains Blender's static trace meshes. The browser canvas
     // is the sole waveform layer, so these must not sit over its live image.
     group.traverse(o => {
-      if (o.isMesh && /^Room_\d+_rolling_(pressure|flow|calculated_volume)/i.test(o.name)) o.visible = false;
+      if (o.isMesh && /(?:_trace|_rolling_(pressure|flow|calculated_volume))$/i.test(o.name)) o.visible = false;
     });
     let hinge = null;
     group.traverse(o => { if (o.name.includes('Elevator_door_hinge')) hinge = o; });
     if (!hinge) throw Error(`Floor ${level}: elevator landing hinge missing`);
     state.doorHinges[level-1] = { object: hinge, base: hinge.quaternion.clone() };
     const roof = roofAsset.scene.clone(true);
+    roof.position.y=(level-sourceLevel)*floorHeight;
     roof.traverse(o=>{if(o.isMesh)o.material=new THREE.MeshBasicMaterial({color:0xc8d3d7,side:THREE.DoubleSide})});
     roof.visible = false;
     scene.add(roof);
@@ -2499,11 +2581,7 @@ async function ensureFloor(hospitalId, level) {
         group.traverse(object=>{if(new RegExp(`^Room_${pad}_(?:circuit|breathing_circuit)`, 'i').test(object.name))object.visible=false;});
         patients.push(null);
       }
-      else if(level===1){
-        const patient=group.getObjectByName(`Patient_${String(room).padStart(3,'0')}`);
-        if(!patient)throw Error(`Floor ${level} room ${room}: patient missing`);
-        patients.push(patient);
-      }else{
+      else{
         const source=patientAsset.scene.getObjectByName('Patient_001');
         if(!source)throw Error('Standalone LOD1 patient missing');
         const clone=source.clone(true);
@@ -2520,9 +2598,9 @@ async function ensureFloor(hospitalId, level) {
         setPatientAirwayVisible(proxy,Boolean(assignment.uc_davis_recording));
         proxy.visible=false;bedRig.add(proxy);proxies.push(proxy);
       }else proxies.push(null);
-      const entry = manifest.rooms.find(e => e.floor === level && e.room === room);
-      const overlayName = `F${String(sourceLevel).padStart(2, '0')}_R${pad}_${entry.record.toUpperCase()}_full-feed_screen_overlay`;
-      const overlay = group.getObjectByName(overlayName);
+      let overlay=null;
+      const overlayPattern=new RegExp(`^F${String(sourceLevel).padStart(2,'0')}_R${pad}_.*_full-feed_screen_overlay$`,'i');
+      group.traverse(object=>{if(object.isMesh && overlayPattern.test(object.name))overlay=object;});
       if (!overlay?.isMesh) throw Error(`Floor ${level} room ${room}: telemetry overlay missing from GLB`);
       configureRoomEquipment(bedRig,overlay,assignment,room);
       const screen = makeScreen(room);
@@ -2569,8 +2647,8 @@ async function boot() {
   let catalogConfig;
   [meta, campusManifest, catalogConfig] = await Promise.all([
     fetch('./scene_meta.json').then(r => r.json()),
-    fetch('./campus_manifest_full_catalog.json?v=20261030-feather-alpha1').then(r=>r.json()),
-    fetch('./catalog_config.json?v=20261030-feather-alpha1').then(r=>r.json()),
+    fetch('./campus_manifest_full_catalog.json?v=20261030-shared-floor1').then(r=>r.json()),
+    fetch('./catalog_config.json?v=20261030-shared-floor1').then(r=>r.json()),
   ]);
   telemetryBase = new URL(catalogConfig.mgh_base,location.href).href;
   modelBase = new URL(catalogConfig.model_base || './',location.href).href;
@@ -2613,7 +2691,6 @@ async function boot() {
   performanceWindowStart = performance.now();
 
   window.wardViewer = { scene, camera, renderer, controls, setFloor, setRoom, selectHospital, overview, showHospitalView, hospitalShell, applyTourFrame, applyUnitTourTime, buildUnitWalkTour, renderUnitTourFrame, meta, campusManifest, cabGroup, breathers, ventRecords, tablet, selectTabletRoom, cycleTabletRoom,
-    get manifest(){return manifest;},
     get tour(){return tour;},
     roomAssignment,
     get ucVentCount(){return ucVentByRoom.size;},
@@ -2633,7 +2710,7 @@ async function boot() {
     get performance() { return { fps: measuredFps, renderScale }; } };
   reportSceneStatus('ready');
   reportSceneLocation(hospitalView?'campus':expandedHospital?'expanded':'floor');
-  setTimeout(()=>loadFloorTemplate(1).catch(error=>console.warn('First floor model prefetch unavailable:',error)),250);
+  setTimeout(()=>loadFloorTemplate().catch(error=>console.warn('Shared floor model prefetch unavailable:',error)),250);
   loadCameraTour()
     .catch(error=>console.warn('Camera tour unavailable:',error));
 }

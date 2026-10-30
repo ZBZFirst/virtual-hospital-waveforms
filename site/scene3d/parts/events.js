@@ -201,9 +201,13 @@ renderer.domElement.addEventListener('click',event=>{
   campusRaycaster.setFromCamera(pointer,camera);
   if(expandedHospital){
     if(!expansion?.finished)return;
-    for(const hit of campusRaycaster.intersectObjects(floors.filter(Boolean).map(floor=>floor.group),true)){
-      const index=floors.findIndex(floor=>{if(!floor)return false;let node=hit.object;while(node){if(node===floor.group)return true;node=node.parent;}return false;});
-      if(index>=0){setFloor(index+1);break;}
+    const targets=[...floors.filter(Boolean).map(floor=>floor.group),...[...floorPreviews.values()].map(preview=>preview.group)];
+    for(const hit of campusRaycaster.intersectObjects(targets,true)){
+      const belongsTo=group=>{let node=hit.object;while(node){if(node===group)return true;node=node.parent;}return false;};
+      const index=floors.findIndex(floor=>floor&&belongsTo(floor.group));
+      const preview=[...floorPreviews.entries()].find(([,item])=>belongsTo(item.group));
+      const level=index>=0?index+1:preview?.[0];
+      if(level){setFloor(level);break;}
     }
     return;
   }

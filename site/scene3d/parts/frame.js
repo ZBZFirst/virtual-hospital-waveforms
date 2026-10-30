@@ -6,20 +6,15 @@ function animate() {
   lastFrameTime = now;
   if(expansion && !expansion.finished){
     const t=Math.min(1,(now-expansion.start)/expansion.duration);
-    const smooth=t*t*(3-2*t),{site,building,materials}=expansion;
+    const smooth=t*t*(3-2*t),{building,materials}=expansion;
     if(!expansion.materialsPrepared){
       for(const material of materials.keys()){material.transparent=true;material.depthWrite=false;material.needsUpdate=true;}
       expansion.materialsPrepared=true;
     }
-    floors.forEach((floor,index)=>{
-      if(!floor)return;
-      const column=index%3,row=Math.floor(index/3);
-      floor.group.position.set(site.x+(column-1)*38*smooth,index*floorHeight*(1-smooth),site.z+(row-.5)*42*smooth);
-      floor.badge.visible=t>0.5;
-    });
     for(const material of materials.keys())material.opacity=Math.max(0,1-smooth*1.12);
-    if(t===1){building.visible=false;expansion.finished=true;status.textContent=`Hospital ${activeHospital} · six floors expanded · select a floor`;}
+    if(t===1){building.visible=false;expansion.finished=true;}
   }
+  tickFloorReveals(now);
   if(floorReturnMove){
     const t=Math.min(1,(now-floorReturnMove.start)/floorReturnMove.duration),smooth=t*t*(3-2*t);
     floorReturnMove.group.position.copy(floorReturnMove.from).multiplyScalar(1-smooth);

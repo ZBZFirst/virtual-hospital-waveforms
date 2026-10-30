@@ -3,6 +3,7 @@ function focus(target, position) {
 }
 
 function resetExpandedView(selectedLevel = null) {
+  clearFloorReveals();
   if(expansion?.materials)for(const [material,old] of expansion.materials){
     material.opacity=old.opacity;material.transparent=old.transparent;material.depthWrite=old.depthWrite;material.needsUpdate=true;
   }
@@ -43,12 +44,6 @@ async function expandHospital(hospitalId) {
   const hospital=campusManifest.hospitals.find(item=>item.id===hospitalId);
   const site=new THREE.Vector3(hospital.position_x_m,0,hospital.position_z_m);
   focus(new THREE.Vector3(site.x,9.5,site.z),new THREE.Vector3(site.x+25,site.y+37,site.z+57));
-  status.textContent=`Hospital ${hospitalId} · loading first floor…`;
-  const loadToken=hospitalStates.get(hospitalId).floors[0]?null:
-    beginModelLoad('floor',`Loading Hospital ${hospitalId}, Floor 1`,floorModelPaths(hospitalId,1));
-  try { await ensureFloor(hospitalId,1); }
-  catch(error){if(loadToken)finishModelLoad(loadToken);if(token===floorSelectToken)showError(`Hospital ${hospitalId} load failed: ${error}`);return;}
-  if(token!==floorSelectToken || activeHospital!==hospitalId){if(loadToken)finishModelLoad(loadToken);return;}
   const building=hospitalShell.children.find(item=>item.userData.hospitalId===hospitalId);
   hospitalShell.children.forEach(item=>item.visible=item===building);
   hospitalView=false;expandedHospital=true;
@@ -58,11 +53,9 @@ async function expandHospital(hospitalId) {
   document.querySelector('#hospitalView').setAttribute('aria-pressed','false');
   document.querySelectorAll('[data-floor]').forEach(button=>button.classList.remove('active'));
   floors.forEach((floor,index)=>{
-    if(!floor)return;
-    floor.group.position.set(site.x,index*floorHeight,site.z);
-    floor.group.visible=true;
-    floor.roof.visible=false;
-    floor.badge.visible=false;
+    if(!floor){makeFloorPreview(index+1,site);return;}
+    floor.group.position.copy(expandedFloorPosition(index+1,site));
+    floor.group.visible=true;floor.roof.visible=false;floor.badge.visible=true;
     floor.patients.forEach((patient,room)=>{if(patient){patient.visible=false;floor.proxies[room].visible=true;}});
   });
   const materials=new Map();
@@ -70,32 +63,39 @@ async function expandHospital(hospitalId) {
     for(const material of Array.isArray(object.material)?object.material:[object.material])
       if(material && !materials.has(material))materials.set(material,{opacity:material.opacity,transparent:material.transparent,depthWrite:material.depthWrite});
   }});
-  expansion={building,materials,site,start:performance.now(),duration:1850,finished:false};
+  expansion={building,materials,site,start:performance.now(),duration:950,finished:false};
   camera.fov=camera.aspect<0.8?72:53;camera.updateProjectionMatrix();
   const expandedEye=camera.aspect<0.8
     ? new THREE.Vector3(site.x,site.y+135,site.z+175)
     : new THREE.Vector3(site.x+12,site.y+65,site.z+92);
   focus(new THREE.Vector3(site.x,1.2,site.z),expandedEye);
   updateRoofs();
-  status.textContent=`Hospital ${hospitalId} · first floor ready · choose any floor`;
+  status.textContent=`Hospital ${hospitalId} · six floor positions ready · loading room details`;
   reportSceneLocation('expanded');
-  if(loadToken)finishModelLoad(loadToken);
-  setTimeout(async()=>{
-    for(let level=2;level<=6;level++){
-      if(token!==floorSelectToken || activeHospital!==hospitalId || !expandedHospital)return;
-      try {
-        const floor=await ensureFloor(hospitalId,level);
-        if(token!==floorSelectToken || activeHospital!==hospitalId || !expandedHospital)return;
-        const column=(level-1)%3,row=Math.floor((level-1)/3);
-        floor.group.position.set(site.x+(column-1)*38,0,site.z+(row-.5)*42);
-        floor.group.visible=true;
-        floor.roof.visible=false;
-        floor.badge.visible=true;
-        floor.patients.forEach((patient,room)=>{if(patient){patient.visible=false;floor.proxies[room].visible=true;}});
-        status.textContent=`Hospital ${hospitalId} · ${level} of 6 floors ready · choose any floor`;
-      } catch(error){showError(`Hospital ${hospitalId} floor ${level} load failed: ${error}`);return;}
-    }
-  },2000);
+  fillExpandedFloorDetails(hospitalId,site,token).catch(error=>showError(`Hospital ${hospitalId} floor loading failed: ${error}`));
+}
+
+async function fillExpandedFloorDetails(hospitalId,site,token){
+  const firstMissing=floorRevealOrder.find(level=>!floors[level-1]);
+  const paths=firstMissing?floorModelPaths(hospitalId,firstMissing):[];
+  const loadToken=paths.some(path=>!modelTransfers.get(path)?.complete)?
+    beginModelLoad('floor','Loading shared floor layout',paths):null;
+  let ready=6-floorPreviews.size;
+  for(const level of floorRevealOrder){
+    if(token!==floorSelectToken || activeHospital!==hospitalId || !expandedHospital)break;
+    if(floors[level-1])continue;
+    let floor;
+    try{floor=await ensureFloor(hospitalId,level);}
+    catch(error){if(loadToken)finishModelLoad(loadToken);if(token===floorSelectToken)showError(`Hospital ${hospitalId} floor ${level} load failed: ${error}`);return;}
+    if(loadToken)finishModelLoad(loadToken);
+    if(token!==floorSelectToken || activeHospital!==hospitalId || !expandedHospital)break;
+    revealFloor(level,floor,site);
+    ready++;
+    status.textContent=`Hospital ${hospitalId} · ${ready} of 6 detailed floors ready`;
+    await new Promise(resolve=>requestAnimationFrame(resolve));
+  }
+  if(token===floorSelectToken && activeHospital===hospitalId && expandedHospital)
+    status.textContent=`Hospital ${hospitalId} · six floors ready · choose any floor`;
 }
 
 function leaveHospitalView() {
@@ -264,8 +264,9 @@ async function setFloor(number, moveCamera = true) {
   const hospitalId=activeHospital;
   requestedFloor=number;
   status.textContent=`Loading hospital ${hospitalId}, floor ${number}…`;
-  const loadToken=hospitalStates.get(hospitalId).floors[number-1]?null:
-    beginModelLoad('floor',`Loading Hospital ${hospitalId}, Floor ${number}`,floorModelPaths(hospitalId,number));
+  const paths=hospitalStates.get(hospitalId).floors[number-1]?[]:floorModelPaths(hospitalId,number);
+  const loadToken=paths.some(path=>!modelTransfers.get(path)?.complete)?
+    beginModelLoad('floor',`Loading Hospital ${hospitalId}, Floor ${number}`,paths):null;
   try { await ensureFloor(hospitalId,number); }
   catch(err) { if(loadToken)finishModelLoad(loadToken);if(token===floorSelectToken){requestedFloor=null;showError(`Floor ${number} load failed: ${err}`);} return; }
   if(token!==floorSelectToken || hospitalId!==activeHospital){if(loadToken)finishModelLoad(loadToken);return;}

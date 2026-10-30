@@ -2,8 +2,8 @@ async function boot() {
   let catalogConfig;
   [meta, campusManifest, catalogConfig] = await Promise.all([
     fetch('./scene_meta.json').then(r => r.json()),
-    fetch('./campus_manifest_full_catalog.json?v=20261030-feather-alpha1').then(r=>r.json()),
-    fetch('./catalog_config.json?v=20261030-feather-alpha1').then(r=>r.json()),
+    fetch('./campus_manifest_full_catalog.json?v=20261030-shared-floor1').then(r=>r.json()),
+    fetch('./catalog_config.json?v=20261030-shared-floor1').then(r=>r.json()),
   ]);
   telemetryBase = new URL(catalogConfig.mgh_base,location.href).href;
   modelBase = new URL(catalogConfig.model_base || './',location.href).href;
@@ -46,7 +46,6 @@ async function boot() {
   performanceWindowStart = performance.now();
 
   window.wardViewer = { scene, camera, renderer, controls, setFloor, setRoom, selectHospital, overview, showHospitalView, hospitalShell, applyTourFrame, applyUnitTourTime, buildUnitWalkTour, renderUnitTourFrame, meta, campusManifest, cabGroup, breathers, ventRecords, tablet, selectTabletRoom, cycleTabletRoom,
-    get manifest(){return manifest;},
     get tour(){return tour;},
     roomAssignment,
     get ucVentCount(){return ucVentByRoom.size;},
@@ -66,7 +65,7 @@ async function boot() {
     get performance() { return { fps: measuredFps, renderScale }; } };
   reportSceneStatus('ready');
   reportSceneLocation(hospitalView?'campus':expandedHospital?'expanded':'floor');
-  setTimeout(()=>loadFloorTemplate(1).catch(error=>console.warn('First floor model prefetch unavailable:',error)),250);
+  setTimeout(()=>loadFloorTemplate().catch(error=>console.warn('Shared floor model prefetch unavailable:',error)),250);
   loadCameraTour()
     .catch(error=>console.warn('Camera tour unavailable:',error));
 }
