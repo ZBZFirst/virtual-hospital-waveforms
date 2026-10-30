@@ -1,6 +1,7 @@
 function setupEvents() {
   const mobileMenuMedia=matchMedia('(max-width:700px)');
   let mobileMenuOpen=false,sceneTimeout=null;
+  const sceneLoadingProgress=$('sceneLoadingProgress'),sceneLoadingAmount=$('sceneLoadingAmount');
   function setMobileMenu(open,restoreFocus=false){
     mobileMenuOpen=mobileMenuMedia.matches&&open;
     els.mobileMenu.classList.toggle('open',mobileMenuOpen);
@@ -19,17 +20,37 @@ function setupEvents() {
   mobileMenuMedia.addEventListener('change',()=>setMobileMenu(false));
   function sceneLoading(status,detail=''){
     clearTimeout(sceneTimeout);
-    if(status==='ready'){els.sceneLoading.hidden=true;return;}
+    if(status==='ready'){els.sceneLoading.hidden=true;delete els.sceneLoading.dataset.modelProgress;return;}
     els.sceneLoading.hidden=false;
+    if(status==='loading'){
+      delete els.sceneLoading.dataset.modelProgress;
+      sceneLoadingProgress.removeAttribute('value');
+      sceneLoadingAmount.textContent='Waiting for scene assets…';
+    }
     els.sceneLoadingTitle.textContent=status==='error'?'Could not load 3D hospitals':status==='slow'?'Still loading 3D hospitals…':'Loading 3D hospitals…';
-    els.sceneLoadingMessage.textContent=detail||'Preparing the hospital scene. Recording transfer progress appears below.';
+    els.sceneLoadingMessage.textContent=detail||'Preparing the hospital scene…';
     els.retryScene.hidden=status==='loading';
     if(status==='loading')sceneTimeout=setTimeout(()=>sceneLoading('slow','The scene is taking longer than expected. You can reload it while recording transfers continue.'),20000);
   }
   sceneLoading('loading');
+  function sceneTransfer(progress){
+    if(!progress.active){
+      if(progress.kind==='floor')els.sceneLoading.hidden=true;
+      return;
+    }
+    clearTimeout(sceneTimeout);
+    els.sceneLoading.hidden=false;
+    els.sceneLoading.dataset.modelProgress='true';
+    els.sceneLoadingTitle.textContent=progress.title;
+    els.sceneLoadingMessage.textContent=progress.phase;
+    sceneLoadingProgress.value=progress.percent;
+    sceneLoadingAmount.textContent=progress.amount;
+    els.retryScene.hidden=true;
+  }
   window.addEventListener('message',event=>{
     if(event.origin!==location.origin||event.source!==els.hospitalScene.contentWindow)return;
     if(event.data?.type==='zebezo-scene-status')sceneLoading(event.data.status,event.data.message);
+    if(event.data?.type==='zebezo-scene-progress')sceneTransfer(event.data);
     if(event.data?.type==='zebezo-scene-location')syncSceneLocation(event.data);
     if(event.data?.type==='zebezo-open-recording'){
       const entry=state.entries.find(item=>item.name===event.data.recording);

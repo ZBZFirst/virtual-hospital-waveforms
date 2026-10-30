@@ -172,6 +172,78 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
+// Source: scene3d/parts/model-sizes.js
+const modelBytes = Object.freeze({"elevator_cab.glb":17400,"hospital_shell.glb":138124,"patient_lods/patient_001_lod1.glb":1034948,"patient_lods/patient_001_lod2.glb":129096,"roof_floor_01.glb":6540,"roof_floor_02.glb":6548,"roof_floor_03.glb":6564,"roof_floor_04.glb":6564,"roof_floor_05.glb":6564,"roof_floor_06.glb":6564,"ward_floor.glb":7432940,"ward_floor_02.glb":3482640,"ward_floor_03.glb":3482560,"ward_floor_04.glb":3482512,"ward_floor_05.glb":4863588,"ward_floor_06.glb":4863308});
+
+// Source: scene3d/parts/load-progress.js
+// Model byte sizes are generated with the release, so the bar includes assets
+// that have not emitted their first network progress event yet.
+const modelTransfers = new Map();
+const modelLoading = document.querySelector('#modelLoading');
+const modelLoadingTitle = document.querySelector('#modelLoadingTitle');
+const modelLoadingBar = document.querySelector('#modelLoadingBar');
+const modelLoadingAmount = document.querySelector('#modelLoadingAmount');
+const modelLoadingPhase = document.querySelector('#modelLoadingPhase');
+let activeModelLoad = null;
+let modelLoadSerial = 0;
+const formatModelBytes = value => `${(value / 1048576).toFixed(1)} MiB`;
+
+function paintModelLoad() {
+  if (!activeModelLoad) return;
+  const { paths, title, kind } = activeModelLoad;
+  let loaded = 0, total = 0, pending = 0;
+  for (const path of paths) {
+    const transfer = modelTransfers.get(path);
+    const size = modelBytes[path] || transfer?.total || 0;
+    total += size;
+    loaded += transfer?.complete ? size : Math.min(transfer?.loaded || 0, size);
+    if (!transfer?.complete) pending++;
+  }
+  const percent = total ? Math.min(100, Math.round(loaded * 100 / total)) : 0;
+  const amount = total ? `${formatModelBytes(loaded)} / ${formatModelBytes(total)} · ${percent}%` : 'Preparing model download…';
+  const phase = pending ? 'Downloading 3D models' : 'Download complete · preparing rooms…';
+  modelLoadingTitle.textContent = title;
+  modelLoadingBar.value = percent;
+  modelLoadingAmount.textContent = amount;
+  modelLoadingPhase.textContent = phase;
+  if (embedded) parent.postMessage({ type: 'zebezo-scene-progress', active: true, kind, title, percent, amount, phase }, location.origin);
+}
+
+function beginModelLoad(kind, title, paths) {
+  const token = ++modelLoadSerial;
+  activeModelLoad = { token, kind, title, paths: [...new Set(paths)] };
+  modelLoading.hidden = false;
+  paintModelLoad();
+  return token;
+}
+
+function finishModelLoad(token) {
+  if (activeModelLoad?.token !== token) return;
+  const { kind } = activeModelLoad;
+  activeModelLoad = null;
+  modelLoading.hidden = true;
+  if (embedded) parent.postMessage({ type: 'zebezo-scene-progress', active: false, kind }, location.origin);
+}
+
+function loadTrackedModel(path) {
+  const progress = modelTransfers.get(path) || { loaded: 0, total: modelBytes[path] || 0, complete: false };
+  modelTransfers.set(path, progress);
+  return modelLoader.loadAsync(modelUrl(path), event => {
+    progress.loaded = event.loaded;
+    progress.total = modelBytes[path] || event.total || progress.total;
+    paintModelLoad();
+  }).then(asset => {
+    progress.complete = true;
+    progress.loaded = modelBytes[path] || progress.total;
+    paintModelLoad();
+    return asset;
+  }).catch(error => {
+    modelTransfers.delete(path);
+    paintModelLoad();
+    throw error;
+  });
+}
+
 // Source: scene3d/parts/screens-and-tablet.js
 function makeScreen(room) {
   const canvas = document.createElement('canvas');
@@ -1095,9 +1167,11 @@ async function expandHospital(hospitalId) {
   const site=new THREE.Vector3(hospital.position_x_m,0,hospital.position_z_m);
   focus(new THREE.Vector3(site.x,9.5,site.z),new THREE.Vector3(site.x+25,site.y+37,site.z+57));
   status.textContent=`Hospital ${hospitalId} · loading first floor…`;
+  const loadToken=hospitalStates.get(hospitalId).floors[0]?null:
+    beginModelLoad('floor',`Loading Hospital ${hospitalId}, Floor 1`,floorModelPaths(hospitalId,1));
   try { await ensureFloor(hospitalId,1); }
-  catch(error){if(token===floorSelectToken)showError(`Hospital ${hospitalId} load failed: ${error}`);return;}
-  if(token!==floorSelectToken || activeHospital!==hospitalId)return;
+  catch(error){if(loadToken)finishModelLoad(loadToken);if(token===floorSelectToken)showError(`Hospital ${hospitalId} load failed: ${error}`);return;}
+  if(token!==floorSelectToken || activeHospital!==hospitalId){if(loadToken)finishModelLoad(loadToken);return;}
   const building=hospitalShell.children.find(item=>item.userData.hospitalId===hospitalId);
   hospitalShell.children.forEach(item=>item.visible=item===building);
   hospitalView=false;expandedHospital=true;
@@ -1128,6 +1202,7 @@ async function expandHospital(hospitalId) {
   updateRoofs();
   status.textContent=`Hospital ${hospitalId} · first floor ready · choose any floor`;
   reportSceneLocation('expanded');
+  if(loadToken)finishModelLoad(loadToken);
   setTimeout(async()=>{
     for(let level=2;level<=6;level++){
       if(token!==floorSelectToken || activeHospital!==hospitalId || !expandedHospital)return;
@@ -1305,9 +1380,11 @@ async function setFloor(number, moveCamera = true) {
   const hospitalId=activeHospital;
   requestedFloor=number;
   status.textContent=`Loading hospital ${hospitalId}, floor ${number}…`;
+  const loadToken=hospitalStates.get(hospitalId).floors[number-1]?null:
+    beginModelLoad('floor',`Loading Hospital ${hospitalId}, Floor ${number}`,floorModelPaths(hospitalId,number));
   try { await ensureFloor(hospitalId,number); }
-  catch(err) { if(token===floorSelectToken){requestedFloor=null;showError(`Floor ${number} load failed: ${err}`);} return; }
-  if(token!==floorSelectToken || hospitalId!==activeHospital)return;
+  catch(err) { if(loadToken)finishModelLoad(loadToken);if(token===floorSelectToken){requestedFloor=null;showError(`Floor ${number} load failed: ${err}`);} return; }
+  if(token!==floorSelectToken || hospitalId!==activeHospital){if(loadToken)finishModelLoad(loadToken);return;}
   resetExpandedView(number);
   leaveHospitalView();
   if(unitTour && unitTour.floor!==number) {
@@ -1336,6 +1413,7 @@ async function setFloor(number, moveCamera = true) {
   }
   status.textContent=`Hospital ${hospitalId} · Floor ${number} · 6 rooms`;
   reportSceneLocation('floor');
+  if(loadToken)finishModelLoad(loadToken);
 }
 
 function updateRoofs() {
@@ -1891,12 +1969,19 @@ function configureRoomEquipment(bedRig, overlay, assignment, room) {
   }
 }
 function loadFloorTemplate(level) {
-  if(!floorTemplates.has(level))floorTemplates.set(level,modelLoader.loadAsync(modelUrl(meta.floors[level-1].file)).catch(error=>{floorTemplates.delete(level);throw error;}));
+  if(!floorTemplates.has(level))floorTemplates.set(level,loadTrackedModel(meta.floors[level-1].file).catch(error=>{floorTemplates.delete(level);throw error;}));
   return floorTemplates.get(level);
 }
 function loadRoofTemplate(level) {
-  if(!roofTemplates.has(level))roofTemplates.set(level,modelLoader.loadAsync(modelUrl(meta.floors[level-1].roof.file)).catch(error=>{roofTemplates.delete(level);throw error;}));
+  if(!roofTemplates.has(level))roofTemplates.set(level,loadTrackedModel(meta.floors[level-1].roof.file).catch(error=>{roofTemplates.delete(level);throw error;}));
   return roofTemplates.get(level);
+}
+function floorModelPaths(hospitalId, level) {
+  const floor = meta.floors[level-1];
+  const paths = [floor.file, floor.roof.file];
+  if(campusManifest.rooms.some(room=>room.hospital_id===hospitalId&&room.floor===level&&room.patient_id))
+    paths.push('patient_lods/patient_001_lod2.glb','patient_lods/patient_001_lod1.glb');
+  return paths;
 }
 async function ensureFloor(hospitalId, level) {
   await loadFloorManifest();
@@ -1906,8 +1991,8 @@ async function ensureFloor(hospitalId, level) {
   const promise = (async () => {
     const hasPatient=campusManifest.rooms.some(room=>room.hospital_id===hospitalId&&room.floor===level&&room.patient_id);
     if(hasPatient)sharedPatientAssets ??= Promise.all([
-      modelLoader.loadAsync(modelUrl('patient_lods/patient_001_lod2.glb')),
-      modelLoader.loadAsync(modelUrl('patient_lods/patient_001_lod1.glb')),
+      loadTrackedModel('patient_lods/patient_001_lod2.glb'),
+      loadTrackedModel('patient_lods/patient_001_lod1.glb'),
     ]).catch(error=>{sharedPatientAssets=null;throw error;});
     const [floorAsset,roofAsset,patientAssets] = await Promise.all([
       loadFloorTemplate(level),
@@ -2023,7 +2108,7 @@ async function boot() {
   [meta, campusManifest, catalogConfig] = await Promise.all([
     fetch('./scene_meta.json').then(r => r.json()),
     fetch('./campus_manifest_full_catalog.json').then(r=>r.json()),
-    fetch('./catalog_config.json?v=20261029-tablet-sweep6').then(r=>r.json()),
+    fetch('./catalog_config.json?v=20261030-model-progress1').then(r=>r.json()),
   ]);
   telemetryBase = new URL(catalogConfig.mgh_base,location.href).href;
   modelBase = new URL(catalogConfig.model_base || './',location.href).href;
@@ -2032,9 +2117,10 @@ async function boot() {
   roomById=new Map(campusManifest.rooms.map(room=>[room.id,room]));
   const loader = new GLTFLoader();
   modelLoader = loader;
+  const bootLoad = beginModelLoad('boot','Loading 3D campus',['elevator_cab.glb',meta.hospital_shell.file]);
   const [elevatorAsset, shellAsset] = await Promise.all([
-    loader.loadAsync(modelUrl('elevator_cab.glb')),
-    loader.loadAsync(modelUrl(meta.hospital_shell.file)),
+    loadTrackedModel('elevator_cab.glb'),
+    loadTrackedModel(meta.hospital_shell.file),
   ]);
   hospitalShell=new THREE.Group();
   hospitalShell.name='Five hospital campus';
@@ -2057,6 +2143,7 @@ async function boot() {
   controls.target.set(0, 0, 0);
   controls.update();
   tablet = makeTablet();
+  finishModelLoad(bootLoad);
   if(new URLSearchParams(location.search).get('view')==='hospital')showHospitalView();
   else await setFloor(1);
   setInterval(()=>{if(floors[activeFloor-1] && !hospitalView)ensureTelemetryCaches();}, 1000);

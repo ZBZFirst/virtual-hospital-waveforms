@@ -25,12 +25,19 @@ function configureRoomEquipment(bedRig, overlay, assignment, room) {
   }
 }
 function loadFloorTemplate(level) {
-  if(!floorTemplates.has(level))floorTemplates.set(level,modelLoader.loadAsync(modelUrl(meta.floors[level-1].file)).catch(error=>{floorTemplates.delete(level);throw error;}));
+  if(!floorTemplates.has(level))floorTemplates.set(level,loadTrackedModel(meta.floors[level-1].file).catch(error=>{floorTemplates.delete(level);throw error;}));
   return floorTemplates.get(level);
 }
 function loadRoofTemplate(level) {
-  if(!roofTemplates.has(level))roofTemplates.set(level,modelLoader.loadAsync(modelUrl(meta.floors[level-1].roof.file)).catch(error=>{roofTemplates.delete(level);throw error;}));
+  if(!roofTemplates.has(level))roofTemplates.set(level,loadTrackedModel(meta.floors[level-1].roof.file).catch(error=>{roofTemplates.delete(level);throw error;}));
   return roofTemplates.get(level);
+}
+function floorModelPaths(hospitalId, level) {
+  const floor = meta.floors[level-1];
+  const paths = [floor.file, floor.roof.file];
+  if(campusManifest.rooms.some(room=>room.hospital_id===hospitalId&&room.floor===level&&room.patient_id))
+    paths.push('patient_lods/patient_001_lod2.glb','patient_lods/patient_001_lod1.glb');
+  return paths;
 }
 async function ensureFloor(hospitalId, level) {
   await loadFloorManifest();
@@ -40,8 +47,8 @@ async function ensureFloor(hospitalId, level) {
   const promise = (async () => {
     const hasPatient=campusManifest.rooms.some(room=>room.hospital_id===hospitalId&&room.floor===level&&room.patient_id);
     if(hasPatient)sharedPatientAssets ??= Promise.all([
-      modelLoader.loadAsync(modelUrl('patient_lods/patient_001_lod2.glb')),
-      modelLoader.loadAsync(modelUrl('patient_lods/patient_001_lod1.glb')),
+      loadTrackedModel('patient_lods/patient_001_lod2.glb'),
+      loadTrackedModel('patient_lods/patient_001_lod1.glb'),
     ]).catch(error=>{sharedPatientAssets=null;throw error;});
     const [floorAsset,roofAsset,patientAssets] = await Promise.all([
       loadFloorTemplate(level),

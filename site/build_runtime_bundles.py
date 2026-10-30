@@ -8,7 +8,7 @@ PAGE = [
     'waveform-detail', 'frame-and-atlas-input', 'events',
 ]
 SCENE = [
-    'core', 'screens-and-tablet', 'nursing-cube', 'patients-and-monitors',
+    'core', 'model-sizes', 'load-progress', 'screens-and-tablet', 'nursing-cube', 'patients-and-monitors',
     'telemetry', 'navigation', 'unit-tour', 'events', 'frame',
     'floor-loader', 'boot',
 ]

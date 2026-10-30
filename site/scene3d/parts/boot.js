@@ -3,7 +3,7 @@ async function boot() {
   [meta, campusManifest, catalogConfig] = await Promise.all([
     fetch('./scene_meta.json').then(r => r.json()),
     fetch('./campus_manifest_full_catalog.json').then(r=>r.json()),
-    fetch('./catalog_config.json?v=20261029-tablet-sweep6').then(r=>r.json()),
+    fetch('./catalog_config.json?v=20261030-model-progress1').then(r=>r.json()),
   ]);
   telemetryBase = new URL(catalogConfig.mgh_base,location.href).href;
   modelBase = new URL(catalogConfig.model_base || './',location.href).href;
@@ -12,9 +12,10 @@ async function boot() {
   roomById=new Map(campusManifest.rooms.map(room=>[room.id,room]));
   const loader = new GLTFLoader();
   modelLoader = loader;
+  const bootLoad = beginModelLoad('boot','Loading 3D campus',['elevator_cab.glb',meta.hospital_shell.file]);
   const [elevatorAsset, shellAsset] = await Promise.all([
-    loader.loadAsync(modelUrl('elevator_cab.glb')),
-    loader.loadAsync(modelUrl(meta.hospital_shell.file)),
+    loadTrackedModel('elevator_cab.glb'),
+    loadTrackedModel(meta.hospital_shell.file),
   ]);
   hospitalShell=new THREE.Group();
   hospitalShell.name='Five hospital campus';
@@ -37,6 +38,7 @@ async function boot() {
   controls.target.set(0, 0, 0);
   controls.update();
   tablet = makeTablet();
+  finishModelLoad(bootLoad);
   if(new URLSearchParams(location.search).get('view')==='hospital')showHospitalView();
   else await setFloor(1);
   setInterval(()=>{if(floors[activeFloor-1] && !hospitalView)ensureTelemetryCaches();}, 1000);

@@ -115,8 +115,11 @@ body { overflow: hidden; }
 .scene-loading-card { width: min(360px,100%); padding: 22px; border: 1px solid #3e6c7b; border-radius: 12px; background: #102c3a; box-shadow: 0 18px 45px #0007; }
 .scene-loading-card strong { display: block; font-size: 18px; }
 .scene-loading-card p { margin: 9px 0 0; color: #b1ced6; font-size: 13px; line-height: 1.45; }
+.scene-loading-card progress { display: block; width: 100%; height: 22px; margin: 18px 0 8px; accent-color: #53d5db; }
+.scene-loading-card output { display: block; color: #d6f2f5; font-size: 13px; font-variant-numeric: tabular-nums; }
 .scene-loading-card button { margin-top: 14px; }
 .scene-spinner { display: block; width: 30px; height: 30px; margin: 0 auto 13px; border: 3px solid #416b7b; border-top-color: #70e0e3; border-radius: 50%; animation: scene-spin .9s linear infinite; }
+.scene-loading[data-model-progress] .scene-spinner { display: none; }
 @keyframes scene-spin { to { transform: rotate(360deg); } }
 .streamer-window[hidden] { display: none; }
 .streamer-window { position: fixed; z-index: 50; top: 172px; right: 20px; width: min(340px,calc(100vw - 24px)); height: 260px; min-width: 220px; min-height: 190px; max-width: 90vw; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; resize: both; color: #e7f5f8; background: #071923; border: 1px solid #69afc0; border-radius: 9px; box-shadow: 0 12px 40px #000b; }

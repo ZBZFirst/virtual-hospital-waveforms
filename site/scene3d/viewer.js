@@ -9,7 +9,7 @@ try {
   await new Promise((resolve, reject) => {
     const script = document.createElement('script');
     const url = new URL('./scene-runtime.js', import.meta.url);
-    url.searchParams.set('v', '20261029-tablet-sweep6');
+    url.searchParams.set('v', '20261030-model-progress1');
     script.src = url.href;
     script.onload = resolve;
     script.onerror = () => reject(new Error('Could not load scene runtime'));

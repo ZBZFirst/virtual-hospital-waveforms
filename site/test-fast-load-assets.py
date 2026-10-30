@@ -11,6 +11,9 @@ ROOT = Path(__file__).resolve().parent
 manifest = json.loads((ROOT / 'manifest.json').read_text())
 campus = json.loads((ROOT / 'scene3d/campus_manifest_full_catalog.json').read_text())
 index = json.loads((ROOT / 'segment-index.json').read_text())
+model_sizes = json.loads((ROOT / 'scene3d/model_sizes.json').read_text())
+assert model_sizes and all((ROOT / 'scene3d' / name).stat().st_size == size
+                           for name, size in model_sizes.items())
 original = gzip.decompress((ROOT / 'atlas_signals.bin.gz').read_bytes())
 room_by_id = {room['id']: room for room in campus['rooms']}
 hospital_ids = [hospital['id'] for hospital in campus['hospitals']]

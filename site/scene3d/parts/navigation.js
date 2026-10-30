@@ -44,9 +44,11 @@ async function expandHospital(hospitalId) {
   const site=new THREE.Vector3(hospital.position_x_m,0,hospital.position_z_m);
   focus(new THREE.Vector3(site.x,9.5,site.z),new THREE.Vector3(site.x+25,site.y+37,site.z+57));
   status.textContent=`Hospital ${hospitalId} · loading first floor…`;
+  const loadToken=hospitalStates.get(hospitalId).floors[0]?null:
+    beginModelLoad('floor',`Loading Hospital ${hospitalId}, Floor 1`,floorModelPaths(hospitalId,1));
   try { await ensureFloor(hospitalId,1); }
-  catch(error){if(token===floorSelectToken)showError(`Hospital ${hospitalId} load failed: ${error}`);return;}
-  if(token!==floorSelectToken || activeHospital!==hospitalId)return;
+  catch(error){if(loadToken)finishModelLoad(loadToken);if(token===floorSelectToken)showError(`Hospital ${hospitalId} load failed: ${error}`);return;}
+  if(token!==floorSelectToken || activeHospital!==hospitalId){if(loadToken)finishModelLoad(loadToken);return;}
   const building=hospitalShell.children.find(item=>item.userData.hospitalId===hospitalId);
   hospitalShell.children.forEach(item=>item.visible=item===building);
   hospitalView=false;expandedHospital=true;
@@ -77,6 +79,7 @@ async function expandHospital(hospitalId) {
   updateRoofs();
   status.textContent=`Hospital ${hospitalId} · first floor ready · choose any floor`;
   reportSceneLocation('expanded');
+  if(loadToken)finishModelLoad(loadToken);
   setTimeout(async()=>{
     for(let level=2;level<=6;level++){
       if(token!==floorSelectToken || activeHospital!==hospitalId || !expandedHospital)return;
@@ -254,9 +257,11 @@ async function setFloor(number, moveCamera = true) {
   const hospitalId=activeHospital;
   requestedFloor=number;
   status.textContent=`Loading hospital ${hospitalId}, floor ${number}…`;
+  const loadToken=hospitalStates.get(hospitalId).floors[number-1]?null:
+    beginModelLoad('floor',`Loading Hospital ${hospitalId}, Floor ${number}`,floorModelPaths(hospitalId,number));
   try { await ensureFloor(hospitalId,number); }
-  catch(err) { if(token===floorSelectToken){requestedFloor=null;showError(`Floor ${number} load failed: ${err}`);} return; }
-  if(token!==floorSelectToken || hospitalId!==activeHospital)return;
+  catch(err) { if(loadToken)finishModelLoad(loadToken);if(token===floorSelectToken){requestedFloor=null;showError(`Floor ${number} load failed: ${err}`);} return; }
+  if(token!==floorSelectToken || hospitalId!==activeHospital){if(loadToken)finishModelLoad(loadToken);return;}
   resetExpandedView(number);
   leaveHospitalView();
   if(unitTour && unitTour.floor!==number) {
@@ -285,6 +290,7 @@ async function setFloor(number, moveCamera = true) {
   }
   status.textContent=`Hospital ${hospitalId} · Floor ${number} · 6 rooms`;
   reportSceneLocation('floor');
+  if(loadToken)finishModelLoad(loadToken);
 }
 
 function updateRoofs() {
