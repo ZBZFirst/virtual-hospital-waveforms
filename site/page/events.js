@@ -180,6 +180,12 @@ function setupEvents() {
   let patientVentWasRunning=false,patientVentWasPlaying=false;
   $('patientVitalTab').addEventListener('click',()=>{
     if($('patientWaveformTabs').hidden || !$('patientNoVital').hidden)return;
+    const vitalRoom=vitalRoomForSelectedRecording();
+    if(vitalRoom){
+      closeDetails();
+      els.hospitalScene.contentWindow?.postMessage({type:'zebezo-scene-action',action:'open-vital-room',roomId:vitalRoom.id},location.origin);
+      return;
+    }
     patientVentWasRunning=window.RoomLive.isRunning();
     patientVentWasPlaying=state.active;
     window.RoomLive.pause();state.active=false;state.lastFrame=0;

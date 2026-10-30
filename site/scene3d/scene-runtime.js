@@ -1178,6 +1178,18 @@ function drawTelemetryFrame(now, elapsed, frustum) {
 }
 
 // Source: scene3d/parts/vital-detail.js
+async function openVitalRoomFromPage(roomId) {
+  const assignment=roomById.get(roomId);
+  if(!assignment?.telemetry_record)return;
+  if(activeHospital!==assignment.hospital_id)await selectHospital(assignment.hospital_id);
+  if(activeFloor!==assignment.floor || hospitalView || expandedHospital || !floors[assignment.floor-1])
+    await setFloor(assignment.floor);
+  if(activeHospital!==assignment.hospital_id || activeFloor!==assignment.floor || !floors[assignment.floor-1])return;
+  if(walkMode && walkRoom!==assignment.room)stopWalk();
+  if(!walkMode)setRoom(assignment.room);
+  openVitalDetail(assignment);
+}
+
 function openVitalDetail(assignment, source='vital') {
   const panel=document.querySelector('#telemetryDetail');
   telemetryDetail={assignment,source,mode:'live',paused:false,elapsed:null,offset:0,
@@ -2509,8 +2521,8 @@ async function boot() {
   let catalogConfig;
   [meta, campusManifest, catalogConfig] = await Promise.all([
     fetch('./scene_meta.json').then(r => r.json()),
-    fetch('./campus_manifest_full_catalog.json?v=20261030-simulation-rooms1').then(r=>r.json()),
-    fetch('./catalog_config.json?v=20261030-simulation-rooms1').then(r=>r.json()),
+    fetch('./campus_manifest_full_catalog.json?v=20261030-vital-handoff1').then(r=>r.json()),
+    fetch('./catalog_config.json?v=20261030-vital-handoff1').then(r=>r.json()),
   ]);
   telemetryBase = new URL(catalogConfig.mgh_base,location.href).href;
   modelBase = new URL(catalogConfig.model_base || './',location.href).href;
@@ -2593,6 +2605,9 @@ window.addEventListener('message',event=>{
     const direction=camera.position.clone().sub(controls.target).multiplyScalar(action==='zoom-in'?0.75:1.35);
     camera.position.copy(controls.target).add(direction);
     controls.update();
+  }
+  else if(action==='open-vital-room'){
+    openVitalRoomFromPage(event.data.roomId).catch(error=>showError(`Vital room handoff failed: ${error}`));
   }
 });
 boot().catch(err=>{showError(String(err?.stack || err));reportSceneStatus('error',String(err?.message || err));});

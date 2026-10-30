@@ -1189,6 +1189,11 @@ function simulationRoomForRecording(roomId,recording) {
   const room=fullCatalogById.get(roomId);
   return room?.simulation_room && room.simulated_uc_davis_recording===recording?room:null;
 }
+function vitalRoomForSelectedRecording() {
+  if(!state.selected)return null;
+  const room=state.sceneRoomContext||fullCatalogByRecording.get(state.selected.name);
+  return room && (room.telemetry_record||room.simulated_telemetry_record)?room:null;
+}
 async function selectEntry(entry,roomContext=null) {
   stopPatientAudio();
   loadPreviewForEntry(entry).catch(()=>{});
@@ -1832,6 +1837,12 @@ function setupEvents() {
   let patientVentWasRunning=false,patientVentWasPlaying=false;
   $('patientVitalTab').addEventListener('click',()=>{
     if($('patientWaveformTabs').hidden || !$('patientNoVital').hidden)return;
+    const vitalRoom=vitalRoomForSelectedRecording();
+    if(vitalRoom){
+      closeDetails();
+      els.hospitalScene.contentWindow?.postMessage({type:'zebezo-scene-action',action:'open-vital-room',roomId:vitalRoom.id},location.origin);
+      return;
+    }
     patientVentWasRunning=window.RoomLive.isRunning();
     patientVentWasPlaying=state.active;
     window.RoomLive.pause();state.active=false;state.lastFrame=0;
@@ -1899,7 +1910,7 @@ async function init() {
   try {
     const [manifest,campus]=await Promise.all([
       fetch('manifest.json').then(response=>{if(!response.ok)throw Error(`Manifest HTTP ${response.status}`);return response.json();}),
-      fetch('scene3d/campus_manifest_full_catalog.json?v=20261030-simulation-rooms1').then(response=>{if(!response.ok)throw Error(`Campus HTTP ${response.status}`);return response.json();})
+      fetch('scene3d/campus_manifest_full_catalog.json?v=20261030-vital-handoff1').then(response=>{if(!response.ok)throw Error(`Campus HTTP ${response.status}`);return response.json();})
     ]);
     state.entries=manifest.entries;
     fullCatalogById=new Map(campus.rooms.map(room=>[room.id,room]));

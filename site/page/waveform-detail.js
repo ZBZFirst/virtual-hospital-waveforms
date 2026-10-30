@@ -11,6 +11,11 @@ function simulationRoomForRecording(roomId,recording) {
   const room=fullCatalogById.get(roomId);
   return room?.simulation_room && room.simulated_uc_davis_recording===recording?room:null;
 }
+function vitalRoomForSelectedRecording() {
+  if(!state.selected)return null;
+  const room=state.sceneRoomContext||fullCatalogByRecording.get(state.selected.name);
+  return room && (room.telemetry_record||room.simulated_telemetry_record)?room:null;
+}
 async function selectEntry(entry,roomContext=null) {
   stopPatientAudio();
   loadPreviewForEntry(entry).catch(()=>{});

@@ -1,3 +1,15 @@
+async function openVitalRoomFromPage(roomId) {
+  const assignment=roomById.get(roomId);
+  if(!assignment?.telemetry_record)return;
+  if(activeHospital!==assignment.hospital_id)await selectHospital(assignment.hospital_id);
+  if(activeFloor!==assignment.floor || hospitalView || expandedHospital || !floors[assignment.floor-1])
+    await setFloor(assignment.floor);
+  if(activeHospital!==assignment.hospital_id || activeFloor!==assignment.floor || !floors[assignment.floor-1])return;
+  if(walkMode && walkRoom!==assignment.room)stopWalk();
+  if(!walkMode)setRoom(assignment.room);
+  openVitalDetail(assignment);
+}
+
 function openVitalDetail(assignment, source='vital') {
   const panel=document.querySelector('#telemetryDetail');
   telemetryDetail={assignment,source,mode:'live',paused:false,elapsed:null,offset:0,

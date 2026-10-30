@@ -2,8 +2,8 @@ async function boot() {
   let catalogConfig;
   [meta, campusManifest, catalogConfig] = await Promise.all([
     fetch('./scene_meta.json').then(r => r.json()),
-    fetch('./campus_manifest_full_catalog.json?v=20261030-simulation-rooms1').then(r=>r.json()),
-    fetch('./catalog_config.json?v=20261030-simulation-rooms1').then(r=>r.json()),
+    fetch('./campus_manifest_full_catalog.json?v=20261030-vital-handoff1').then(r=>r.json()),
+    fetch('./catalog_config.json?v=20261030-vital-handoff1').then(r=>r.json()),
   ]);
   telemetryBase = new URL(catalogConfig.mgh_base,location.href).href;
   modelBase = new URL(catalogConfig.model_base || './',location.href).href;
@@ -86,6 +86,9 @@ window.addEventListener('message',event=>{
     const direction=camera.position.clone().sub(controls.target).multiplyScalar(action==='zoom-in'?0.75:1.35);
     camera.position.copy(controls.target).add(direction);
     controls.update();
+  }
+  else if(action==='open-vital-room'){
+    openVitalRoomFromPage(event.data.roomId).catch(error=>showError(`Vital room handoff failed: ${error}`));
   }
 });
 boot().catch(err=>{showError(String(err?.stack || err));reportSceneStatus('error',String(err?.message || err));});
