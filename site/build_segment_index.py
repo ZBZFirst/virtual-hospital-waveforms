@@ -1,4 +1,4 @@
-"""Read-only byte index for nominal 30-minute CSV ranges at 50 Hz.
+"""Read-only byte index with a short opening range and longer continuations.
 
 Each range includes enough neighboring samples to draw a 120-second window and
 begins/ends at breath starts where possible. The original files are unchanged.
@@ -14,6 +14,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 SOURCE = HERE.parent
 SAMPLES_PER_SEGMENT = 90_000
+OPENING_SAMPLES = 3_000
 CONTEXT_SAMPLES = 6_000
 OVERVIEW_BINS = 2_048
 NUMBER = re.compile(rb"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$")
@@ -26,10 +27,13 @@ def describe(entry):
     if len(data) != entry["bytes"]:
         raise ValueError(f"Source byte count changed: {path.name}")
     sample_count = entry["samples"]
+    boundaries = [0, min(OPENING_SAMPLES, sample_count)]
+    while boundaries[-1] < sample_count:
+        boundaries.append(min(sample_count, boundaries[-1] + SAMPLES_PER_SEGMENT))
     targets = {0, sample_count}
-    for core in range(0, sample_count, SAMPLES_PER_SEGMENT):
-        targets.add(max(0, core - CONTEXT_SAMPLES))
-        targets.add(min(sample_count, core + SAMPLES_PER_SEGMENT + CONTEXT_SAMPLES))
+    for core_start, core_end in zip(boundaries, boundaries[1:]):
+        targets.add(max(0, core_start - CONTEXT_SAMPLES))
+        targets.add(min(sample_count, core_end + CONTEXT_SAMPLES))
     offsets = {0: 0, sample_count: len(data)}
     starts = []
     low = [math.inf] * OVERVIEW_BINS
@@ -70,8 +74,7 @@ def describe(entry):
         raise ValueError(f"BS marker count changed in {path.name}")
     positions = [item[0] for item in starts]
     segments = []
-    for core_start in range(0, sample_count, SAMPLES_PER_SEGMENT):
-        core_end = min(sample_count, core_start + SAMPLES_PER_SEGMENT)
+    for core_start, core_end in zip(boundaries, boundaries[1:]):
         start_target = max(0, core_start - CONTEXT_SAMPLES)
         end_target = min(sample_count, core_end + CONTEXT_SAMPLES)
         before = bisect.bisect_right(positions, start_target) - 1
@@ -100,11 +103,17 @@ def main():
         raise ValueError("This index requires the verified 50 Hz source rate")
     feeds = {entry["name"]: describe(entry) for entry in manifest["entries"]}
     index = {"version": 1, "sampleRate": 50, "segmentSamples": SAMPLES_PER_SEGMENT,
-             "contextSamples": CONTEXT_SAMPLES,
+             "contextSamples": CONTEXT_SAMPLES, "openingSamples": OPENING_SAMPLES,
              "sourceRevision": "32063407e7fffb75d3866d080078d80295de476c",
              "feeds": feeds}
     output = HERE / "segment-index.json"
     output.write_text(json.dumps(index, separators=(",", ":")) + "\n")
+    shards = HERE / 'feed-index'
+    shards.mkdir(exist_ok=True)
+    for name, feed in feeds.items():
+        shard = {key: value for key, value in index.items() if key != 'feeds'}
+        shard['feeds'] = {name: feed}
+        (shards / f'{name}.json').write_text(json.dumps(shard, separators=(",", ":")) + "\n")
     total = sum(segment["byteEnd"] - segment["byteStart"]
                 for feed in feeds.values() for segment in feed["segments"][:1])
     print(f"Indexed {len(feeds)} feeds; first ranges total {total:,} bytes; {output.stat().st_size:,} byte index")

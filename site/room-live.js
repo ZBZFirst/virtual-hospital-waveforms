@@ -32,7 +32,7 @@
     if(!file||status==='done'||status==='running'||status==='loading')return;
     const token=++generation;setStatus('loading','LOADING CSV');
     (async()=>{
-      await access.ready();if(token!==generation)return;
+      await access.ready(entry);if(token!==generation)return;
       data=access.data(entry);
       const recent=Math.max(0,cursor-windowSeconds*50);
       await access.ensure(entry,data,Math.min(entry.samples-1,recent));

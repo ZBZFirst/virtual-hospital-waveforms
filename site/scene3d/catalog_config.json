@@ -1,5 +1,5 @@
 {
-  "mgh_base": "../../mgh/",
+  "mgh_base": "https://raw.githubusercontent.com/ZBZFirst/virtual-hospital-waveforms/6ca32e46c75e7743406f3fbaa25062248de2429c/mgh/",
   "model_base": "./",
-  "note": "Relative path for GitHub Pages or a local server rooted at this repository."
+  "note": "MGH source ranges use the pinned GitHub revision; 3D models are served from this versioned site release."
 }
