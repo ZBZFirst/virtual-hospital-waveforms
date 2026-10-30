@@ -1,5 +1,6 @@
 .streamer-window canvas { display: block; width: 100%; flex: 1; min-height: 0; object-fit: contain; background: #000; }
 .streamer-window.mask-transparent,.streamer-window.mask-transparent canvas { background: transparent; }
+body.streamer-clean .streamer-window,body.streamer-clean .streamer-window canvas { background: transparent; }
 .streamer-layout .streamer-theme { display: flex; align-items: center; gap: 5px; margin: 0 2px; color: #d3edf2; font-size: 11px; }
 .streamer-layout .streamer-theme select { min-height: 30px; padding: 4px 6px; font-size: 11px; }
 body.streamer-mode .atlas-footer > .zb-theme-switcher { display: none; }

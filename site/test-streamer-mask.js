@@ -3,6 +3,8 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const source=fs.readFileSync('streamer-mask.js','utf8');
+const html=fs.readFileSync('index.html','utf8');
+const css=fs.readFileSync('streamer-mask.css','utf8');
 const begin=source.indexOf('function cameraError(');
 const end=source.indexOf('\n}\nasync function start(',begin);
 assert(begin>=0&&end>begin);
@@ -24,6 +26,11 @@ assert.deepEqual(crop(shapes,1,'full',0),{x:0,y:0,width:1280,height:720,active:f
 assert.deepEqual(crop([],null,'selected',8),{x:0,y:0,width:1280,height:720,active:false});
 assert.deepEqual(crop([{id:3,x:.9,y:.9,w:.1,h:.1}],3,'selected',30),
   {x:1113,y:626,width:167,height:94,active:true});
+assert.deepEqual(JSON.parse(JSON.stringify(context.cropBounds(shapes,1,'selected',0,1280,720,8))),
+  {x:752,y:128,width:288,height:392,active:true});
+assert(html.includes('<option value="transparent" selected>Transparent</option>'));
+assert(css.includes('body.streamer-clean .streamer-window canvas { background: transparent; }'));
+assert(source.includes("$('background').onchange();"));
 assert(source.includes('outputCtx.drawImage(framed,0,0)'));
 assert(source.includes('previewCtx.drawImage(composite,0,0)'));
 assert(source.includes('framed.captureStream(30)'));

@@ -30,7 +30,7 @@ function dimensions(width,height){
     if(canvas.height!==height)canvas.height=height;
   }
 }
-function cropBounds(shapes,selectedId,mode,padding,width,height){
+function cropBounds(shapes,selectedId,mode,padding,width,height,feather=0){
   const full={x:0,y:0,width,height,active:false};
   if(mode==='full')return full;
   const chosen=mode==='selected'?shapes.filter(shape=>shape.id===selectedId):shapes;
@@ -39,14 +39,16 @@ function cropBounds(shapes,selectedId,mode,padding,width,height){
   const right=Math.max(...chosen.map(shape=>shape.x+shape.w));
   const bottom=Math.max(...chosen.map(shape=>shape.y+shape.h));
   const margin=clamp(Number(padding)||0,0,50)/100;
-  const x=Math.floor(clamp(left-(right-left)*margin,0,1)*width);
-  const y=Math.floor(clamp(top-(bottom-top)*margin,0,1)*height);
-  const edgeX=Math.ceil(clamp(right+(right-left)*margin,0,1)*width);
-  const edgeY=Math.ceil(clamp(bottom+(bottom-top)*margin,0,1)*height);
+  const marginX=Math.max((right-left)*margin,Math.max(0,Number(feather)||0)*2/width);
+  const marginY=Math.max((bottom-top)*margin,Math.max(0,Number(feather)||0)*2/height);
+  const x=Math.floor(clamp(left-marginX,0,1)*width);
+  const y=Math.floor(clamp(top-marginY,0,1)*height);
+  const edgeX=Math.ceil(clamp(right+marginX,0,1)*width);
+  const edgeY=Math.ceil(clamp(bottom+marginY,0,1)*height);
   return {x,y,width:Math.max(1,edgeX-x),height:Math.max(1,edgeY-y),active:true};
 }
 function currentCrop(){return cropBounds(regions,selected,$('framing').value,$('cropPadding').value,
-  composite.width||video.videoWidth||1280,composite.height||video.videoHeight||720);}
+  composite.width||video.videoWidth||1280,composite.height||video.videoHeight||720,$('feather').value);}
 function fitWindowToCrop(){
   if(panel.hidden||!stream)return;
   const crop=currentCrop(),aspect=crop.width/crop.height;
@@ -296,7 +298,7 @@ $('background').onchange=()=>{
   $('imageControls').hidden=$('background').value!=='image';
   $('blurControls').hidden=$('background').value!=='blur';
   panel.classList.toggle('mask-transparent',$('background').value==='transparent');
-};$('blurControls').hidden=true;
+};$('background').onchange();
 $('imageUpload').onchange=async event=>{
   const file=event.target.files?.[0];if(!file)return;
   if(!['image/png','image/jpeg','image/webp','image/gif'].includes(file.type)){
