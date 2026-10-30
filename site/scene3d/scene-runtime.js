@@ -1466,18 +1466,25 @@ function makeFloorPreview(level,site){
   if(floorPreviews.has(level))return floorPreviews.get(level);
   const group=new THREE.Group(),y=(level-1)*floorHeight;
   const slabMaterial=new THREE.MeshBasicMaterial({color:0x6f8f99,transparent:true,opacity:.35,depthWrite:false,side:THREE.DoubleSide});
-  const roomMaterial=new THREE.MeshBasicMaterial({color:0xa8c6cc,transparent:true,opacity:.55,depthWrite:false,wireframe:true});
+  const roomMaterial=new THREE.MeshBasicMaterial({color:0xa8c6cc,transparent:true,opacity:.48,depthWrite:false,side:THREE.DoubleSide});
+  const stationMaterial=new THREE.MeshBasicMaterial({color:0xb39562,transparent:true,opacity:.7,depthWrite:false});
   const slab=new THREE.Mesh(new THREE.BoxGeometry(34.2,.15,24.2),slabMaterial);
   slab.position.y=y-.08;group.add(slab);
-  const roomGeometry=new THREE.BoxGeometry(9,.15,6.6);
+  const longWall=new THREE.BoxGeometry(9,1.4,.12),shortWall=new THREE.BoxGeometry(.12,1.4,6.6);
   for(const [x,z] of [[-10,-7],[0,-7],[10,-7],[-10,7],[0,7],[10,7]]){
-    const room=new THREE.Mesh(roomGeometry,roomMaterial);
-    room.position.set(x,y+.08,z);group.add(room);
+    for(const offset of [-3.3,3.3]){
+      const wall=new THREE.Mesh(longWall,roomMaterial);wall.position.set(x,y+.7,z+offset);group.add(wall);
+    }
+    for(const offset of [-4.5,4.5]){
+      const wall=new THREE.Mesh(shortWall,roomMaterial);wall.position.set(x+offset,y+.7,z);group.add(wall);
+    }
   }
+  const station=new THREE.Mesh(new THREE.BoxGeometry(4.8,.55,3.4),stationMaterial);
+  station.position.set(0,y+.28,0);group.add(station);
   const badge=makeFloorBadge(level);badge.visible=true;group.add(badge);
   group.position.copy(expandedFloorPosition(level,site));
   scene.add(group);
-  const preview={group,materials:new Map([[slabMaterial,slabMaterial.opacity],[roomMaterial,roomMaterial.opacity],
+  const preview={group,materials:new Map([[slabMaterial,slabMaterial.opacity],[roomMaterial,roomMaterial.opacity],[stationMaterial,stationMaterial.opacity],
     [badge.material,badge.material.opacity]])};
   floorPreviews.set(level,preview);
   return preview;
@@ -1594,10 +1601,8 @@ async function expandHospital(hospitalId) {
   document.querySelector('#hospitalView').setAttribute('aria-pressed','false');
   document.querySelectorAll('[data-floor]').forEach(button=>button.classList.remove('active'));
   floors.forEach((floor,index)=>{
-    if(!floor){makeFloorPreview(index+1,site);return;}
-    floor.group.position.copy(expandedFloorPosition(index+1,site));
-    floor.group.visible=true;floor.roof.visible=false;floor.badge.visible=true;
-    floor.patients.forEach((patient,room)=>{if(patient){patient.visible=false;floor.proxies[room].visible=true;}});
+    makeFloorPreview(index+1,site);
+    if(floor){floor.group.visible=false;floor.roof.visible=false;floor.badge.visible=false;}
   });
   const materials=new Map();
   building.traverse(object=>{if(object.isMesh && object.visible){
@@ -1621,10 +1626,9 @@ async function fillExpandedFloorDetails(hospitalId,site,token){
   const paths=firstMissing?floorModelPaths(hospitalId,firstMissing):[];
   const loadToken=paths.some(path=>!modelTransfers.get(path)?.complete)?
     beginModelLoad('floor','Loading shared floor layout',paths):null;
-  let ready=6-floorPreviews.size;
+  let ready=0;
   for(const level of floorRevealOrder){
     if(token!==floorSelectToken || activeHospital!==hospitalId || !expandedHospital)break;
-    if(floors[level-1])continue;
     let floor;
     try{floor=await ensureFloor(hospitalId,level);}
     catch(error){if(loadToken)finishModelLoad(loadToken);if(token===floorSelectToken)showError(`Hospital ${hospitalId} floor ${level} load failed: ${error}`);return;}
@@ -2527,6 +2531,7 @@ async function ensureFloor(hospitalId, level) {
   const state=hospitalStates.get(hospitalId), key=`${hospitalId}:${level}`;
   if (state.floors[level-1]) return state.floors[level-1];
   if (floorLoads.has(key)) return floorLoads.get(key);
+  let group=null,roof=null;
   const promise = (async () => {
     const hasPatient=campusManifest.rooms.some(room=>room.hospital_id===hospitalId&&room.floor===level&&room.patient_id);
     if(hasPatient)sharedPatientAssets ??= Promise.all([
@@ -2540,7 +2545,7 @@ async function ensureFloor(hospitalId, level) {
     ]);
     const [lowPatientAsset,patientAsset] = patientAssets || [];
     const sourceLevel=meta.shared_floor_template_level;
-    const group = new THREE.Group();
+    group = new THREE.Group();
     const floorGeometry=floorAsset.scene.clone(true);
     floorGeometry.position.y=(level-sourceLevel)*floorHeight;
     group.add(floorGeometry);
@@ -2556,7 +2561,7 @@ async function ensureFloor(hospitalId, level) {
     group.traverse(o => { if (o.name.includes('Elevator_door_hinge')) hinge = o; });
     if (!hinge) throw Error(`Floor ${level}: elevator landing hinge missing`);
     state.doorHinges[level-1] = { object: hinge, base: hinge.quaternion.clone() };
-    const roof = roofAsset.scene.clone(true);
+    roof = roofAsset.scene.clone(true);
     roof.position.y=(level-sourceLevel)*floorHeight;
     roof.traverse(o=>{if(o.isMesh)o.material=new THREE.MeshBasicMaterial({color:0xc8d3d7,side:THREE.DoubleSide})});
     roof.visible = false;
@@ -2573,7 +2578,7 @@ async function ensureFloor(hospitalId, level) {
       const assignment=roomAssignment(hospitalId,level,room);
       if(!assignment)throw Error(`Hospital ${hospitalId} floor ${level} room ${room}: missing room assignment slot`);
       if(room===6 && assignment.simulation_room)hinge.add(makeSimulationRoomSign());
-      const occupancyName=level===1?`Room_${pad}_OCCUPANCY_display`:`F${String(level).padStart(2,'0')}_|_Room_${pad}_OCCUPANCY_display`;
+      const occupancyName=`F${String(sourceLevel).padStart(2,'0')}_|_Room_${pad}_OCCUPANCY_display`;
       const target=group.getObjectByName(occupancyName);
       if(!target)throw Error(`Hospital ${hospitalId} floor ${level} room ${room}: occupancy group missing`);
       if(!assignment.patient_id){
@@ -2639,7 +2644,13 @@ async function ensureFloor(hospitalId, level) {
   })();
   floorLoads.set(key,promise);
   try { return await promise; }
-  catch(error) { floorLoads.delete(key); throw error; }
+  catch(error) {
+    floorLoads.delete(key);
+    if(group)scene.remove(group);
+    if(roof)scene.remove(roof);
+    state.doorHinges[level-1]=null;
+    throw error;
+  }
 }
 
 // Source: scene3d/parts/boot.js
@@ -2647,8 +2658,8 @@ async function boot() {
   let catalogConfig;
   [meta, campusManifest, catalogConfig] = await Promise.all([
     fetch('./scene_meta.json').then(r => r.json()),
-    fetch('./campus_manifest_full_catalog.json?v=20261030-shared-floor1').then(r=>r.json()),
-    fetch('./catalog_config.json?v=20261030-shared-floor1').then(r=>r.json()),
+    fetch('./campus_manifest_full_catalog.json?v=20261030-shared-floor2').then(r=>r.json()),
+    fetch('./catalog_config.json?v=20261030-shared-floor2').then(r=>r.json()),
   ]);
   telemetryBase = new URL(catalogConfig.mgh_base,location.href).href;
   modelBase = new URL(catalogConfig.model_base || './',location.href).href;

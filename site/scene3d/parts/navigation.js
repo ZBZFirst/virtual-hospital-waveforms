@@ -53,10 +53,8 @@ async function expandHospital(hospitalId) {
   document.querySelector('#hospitalView').setAttribute('aria-pressed','false');
   document.querySelectorAll('[data-floor]').forEach(button=>button.classList.remove('active'));
   floors.forEach((floor,index)=>{
-    if(!floor){makeFloorPreview(index+1,site);return;}
-    floor.group.position.copy(expandedFloorPosition(index+1,site));
-    floor.group.visible=true;floor.roof.visible=false;floor.badge.visible=true;
-    floor.patients.forEach((patient,room)=>{if(patient){patient.visible=false;floor.proxies[room].visible=true;}});
+    makeFloorPreview(index+1,site);
+    if(floor){floor.group.visible=false;floor.roof.visible=false;floor.badge.visible=false;}
   });
   const materials=new Map();
   building.traverse(object=>{if(object.isMesh && object.visible){
@@ -80,10 +78,9 @@ async function fillExpandedFloorDetails(hospitalId,site,token){
   const paths=firstMissing?floorModelPaths(hospitalId,firstMissing):[];
   const loadToken=paths.some(path=>!modelTransfers.get(path)?.complete)?
     beginModelLoad('floor','Loading shared floor layout',paths):null;
-  let ready=6-floorPreviews.size;
+  let ready=0;
   for(const level of floorRevealOrder){
     if(token!==floorSelectToken || activeHospital!==hospitalId || !expandedHospital)break;
-    if(floors[level-1])continue;
     let floor;
     try{floor=await ensureFloor(hospitalId,level);}
     catch(error){if(loadToken)finishModelLoad(loadToken);if(token===floorSelectToken)showError(`Hospital ${hospitalId} floor ${level} load failed: ${error}`);return;}

@@ -64,6 +64,7 @@ async function ensureFloor(hospitalId, level) {
   const state=hospitalStates.get(hospitalId), key=`${hospitalId}:${level}`;
   if (state.floors[level-1]) return state.floors[level-1];
   if (floorLoads.has(key)) return floorLoads.get(key);
+  let group=null,roof=null;
   const promise = (async () => {
     const hasPatient=campusManifest.rooms.some(room=>room.hospital_id===hospitalId&&room.floor===level&&room.patient_id);
     if(hasPatient)sharedPatientAssets ??= Promise.all([
@@ -77,7 +78,7 @@ async function ensureFloor(hospitalId, level) {
     ]);
     const [lowPatientAsset,patientAsset] = patientAssets || [];
     const sourceLevel=meta.shared_floor_template_level;
-    const group = new THREE.Group();
+    group = new THREE.Group();
     const floorGeometry=floorAsset.scene.clone(true);
     floorGeometry.position.y=(level-sourceLevel)*floorHeight;
     group.add(floorGeometry);
@@ -93,7 +94,7 @@ async function ensureFloor(hospitalId, level) {
     group.traverse(o => { if (o.name.includes('Elevator_door_hinge')) hinge = o; });
     if (!hinge) throw Error(`Floor ${level}: elevator landing hinge missing`);
     state.doorHinges[level-1] = { object: hinge, base: hinge.quaternion.clone() };
-    const roof = roofAsset.scene.clone(true);
+    roof = roofAsset.scene.clone(true);
     roof.position.y=(level-sourceLevel)*floorHeight;
     roof.traverse(o=>{if(o.isMesh)o.material=new THREE.MeshBasicMaterial({color:0xc8d3d7,side:THREE.DoubleSide})});
     roof.visible = false;
@@ -110,7 +111,7 @@ async function ensureFloor(hospitalId, level) {
       const assignment=roomAssignment(hospitalId,level,room);
       if(!assignment)throw Error(`Hospital ${hospitalId} floor ${level} room ${room}: missing room assignment slot`);
       if(room===6 && assignment.simulation_room)hinge.add(makeSimulationRoomSign());
-      const occupancyName=level===1?`Room_${pad}_OCCUPANCY_display`:`F${String(level).padStart(2,'0')}_|_Room_${pad}_OCCUPANCY_display`;
+      const occupancyName=`F${String(sourceLevel).padStart(2,'0')}_|_Room_${pad}_OCCUPANCY_display`;
       const target=group.getObjectByName(occupancyName);
       if(!target)throw Error(`Hospital ${hospitalId} floor ${level} room ${room}: occupancy group missing`);
       if(!assignment.patient_id){
@@ -176,5 +177,11 @@ async function ensureFloor(hospitalId, level) {
   })();
   floorLoads.set(key,promise);
   try { return await promise; }
-  catch(error) { floorLoads.delete(key); throw error; }
+  catch(error) {
+    floorLoads.delete(key);
+    if(group)scene.remove(group);
+    if(roof)scene.remove(roof);
+    state.doorHinges[level-1]=null;
+    throw error;
+  }
 }

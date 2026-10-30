@@ -40,6 +40,8 @@ assert 'const sharedFloorMeta=()=>meta.floors[meta.shared_floor_template_level-1
 assert 'entry.record' not in loader
 assert 'else if(level===1)' not in loader
 assert 'loadFloorManifest()' not in loader
+assert 'const occupancyName=`F${String(sourceLevel)' in loader
+assert 'level===1?`Room_' not in loader
 reveal = (scene / 'parts/floor-reveal.js').read_text()
 assert 'floorRevealOrder=[4,5,6,1,2,3]' in reveal
 print('One GLB supplies six floor levels; patient and monitor sources remain room assignments')

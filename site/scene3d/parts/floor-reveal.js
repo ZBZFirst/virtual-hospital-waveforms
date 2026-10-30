@@ -9,18 +9,25 @@ function makeFloorPreview(level,site){
   if(floorPreviews.has(level))return floorPreviews.get(level);
   const group=new THREE.Group(),y=(level-1)*floorHeight;
   const slabMaterial=new THREE.MeshBasicMaterial({color:0x6f8f99,transparent:true,opacity:.35,depthWrite:false,side:THREE.DoubleSide});
-  const roomMaterial=new THREE.MeshBasicMaterial({color:0xa8c6cc,transparent:true,opacity:.55,depthWrite:false,wireframe:true});
+  const roomMaterial=new THREE.MeshBasicMaterial({color:0xa8c6cc,transparent:true,opacity:.48,depthWrite:false,side:THREE.DoubleSide});
+  const stationMaterial=new THREE.MeshBasicMaterial({color:0xb39562,transparent:true,opacity:.7,depthWrite:false});
   const slab=new THREE.Mesh(new THREE.BoxGeometry(34.2,.15,24.2),slabMaterial);
   slab.position.y=y-.08;group.add(slab);
-  const roomGeometry=new THREE.BoxGeometry(9,.15,6.6);
+  const longWall=new THREE.BoxGeometry(9,1.4,.12),shortWall=new THREE.BoxGeometry(.12,1.4,6.6);
   for(const [x,z] of [[-10,-7],[0,-7],[10,-7],[-10,7],[0,7],[10,7]]){
-    const room=new THREE.Mesh(roomGeometry,roomMaterial);
-    room.position.set(x,y+.08,z);group.add(room);
+    for(const offset of [-3.3,3.3]){
+      const wall=new THREE.Mesh(longWall,roomMaterial);wall.position.set(x,y+.7,z+offset);group.add(wall);
+    }
+    for(const offset of [-4.5,4.5]){
+      const wall=new THREE.Mesh(shortWall,roomMaterial);wall.position.set(x+offset,y+.7,z);group.add(wall);
+    }
   }
+  const station=new THREE.Mesh(new THREE.BoxGeometry(4.8,.55,3.4),stationMaterial);
+  station.position.set(0,y+.28,0);group.add(station);
   const badge=makeFloorBadge(level);badge.visible=true;group.add(badge);
   group.position.copy(expandedFloorPosition(level,site));
   scene.add(group);
-  const preview={group,materials:new Map([[slabMaterial,slabMaterial.opacity],[roomMaterial,roomMaterial.opacity],
+  const preview={group,materials:new Map([[slabMaterial,slabMaterial.opacity],[roomMaterial,roomMaterial.opacity],[stationMaterial,stationMaterial.opacity],
     [badge.material,badge.material.opacity]])};
   floorPreviews.set(level,preview);
   return preview;
