@@ -338,7 +338,7 @@ function drawVentScreen(canvas, record, elapsed) {
 
 function drawVentilatorsFrame(elapsed, frustum) {
   if(hospitalView || expandedHospital)return;
-  if (!ventRecords.length || !floors[activeFloor - 1]) return;
+  if (!floors[activeFloor - 1]) return;
   const screens = floors[activeFloor - 1].ventScreens;
   screens.forEach((screen, i) => {
     if (!frustum.intersectsBox(screen.worldBox)) return;
@@ -1082,10 +1082,11 @@ function drawTelemetryFrame(now, elapsed, frustum) {
   if (!telemetryReady[activeFloor - 1]) return;
   const floor = activeFloor;
   const records = floorRecords[floor - 1];
-  if (!records || records.some(r => r && !isCached(r, elapsed))) {
+  if (!records) {
     ensureTelemetryCaches();
     return;
   }
+  if (records.some(record => record && !isCached(record, elapsed))) ensureTelemetryCaches();
   if(!records.some(Boolean))return;
   const screens = floors[floor - 1].screens;
   const nearest = Math.min(...screens.map(s => camera.position.distanceTo(s.center)));
@@ -1098,7 +1099,7 @@ function drawTelemetryFrame(now, elapsed, frustum) {
   // hidden screen catches up on its next visible frame.
   for (const i of visible) {
     const record = records[i];
-    if(!record)continue;
+    if(!record || !isCached(record, elapsed))continue;
     const start = recordClock(record, elapsed) - record.windows.length;
     for (let j = 0; j < record.windows.length; j++) {
       record.windows[j] = ((start + j) % record.samples + record.samples) % record.samples;
@@ -2108,7 +2109,7 @@ async function boot() {
   [meta, campusManifest, catalogConfig] = await Promise.all([
     fetch('./scene_meta.json').then(r => r.json()),
     fetch('./campus_manifest_full_catalog.json').then(r=>r.json()),
-    fetch('./catalog_config.json?v=20261030-model-progress1').then(r=>r.json()),
+    fetch('./catalog_config.json?v=20261030-room-monitor-sync1').then(r=>r.json()),
   ]);
   telemetryBase = new URL(catalogConfig.mgh_base,location.href).href;
   modelBase = new URL(catalogConfig.model_base || './',location.href).href;

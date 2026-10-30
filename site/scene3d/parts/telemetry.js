@@ -112,10 +112,11 @@ function drawTelemetryFrame(now, elapsed, frustum) {
   if (!telemetryReady[activeFloor - 1]) return;
   const floor = activeFloor;
   const records = floorRecords[floor - 1];
-  if (!records || records.some(r => r && !isCached(r, elapsed))) {
+  if (!records) {
     ensureTelemetryCaches();
     return;
   }
+  if (records.some(record => record && !isCached(record, elapsed))) ensureTelemetryCaches();
   if(!records.some(Boolean))return;
   const screens = floors[floor - 1].screens;
   const nearest = Math.min(...screens.map(s => camera.position.distanceTo(s.center)));
@@ -128,7 +129,7 @@ function drawTelemetryFrame(now, elapsed, frustum) {
   // hidden screen catches up on its next visible frame.
   for (const i of visible) {
     const record = records[i];
-    if(!record)continue;
+    if(!record || !isCached(record, elapsed))continue;
     const start = recordClock(record, elapsed) - record.windows.length;
     for (let j = 0; j < record.windows.length; j++) {
       record.windows[j] = ((start + j) % record.samples + record.samples) % record.samples;

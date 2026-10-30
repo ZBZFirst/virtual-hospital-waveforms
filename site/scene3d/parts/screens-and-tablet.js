@@ -91,7 +91,7 @@ function drawVentScreen(canvas, record, elapsed) {
 
 function drawVentilatorsFrame(elapsed, frustum) {
   if(hospitalView || expandedHospital)return;
-  if (!ventRecords.length || !floors[activeFloor - 1]) return;
+  if (!floors[activeFloor - 1]) return;
   const screens = floors[activeFloor - 1].ventScreens;
   screens.forEach((screen, i) => {
     if (!frustum.intersectsBox(screen.worldBox)) return;
