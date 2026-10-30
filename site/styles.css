@@ -129,6 +129,14 @@ body { overflow: hidden; }
 .streamer-titlebar button,.streamer-foot button { min-height: 28px; padding: 3px 7px; font-size: 11px; }
 .streamer-foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 28px; padding: 4px 9px; color: #aad1da; font-size: 11px; }
 .streamer-window.is-dragging { opacity: .93; }
+.streamer-restore[hidden] { display: none; }
+.streamer-restore { position: absolute; z-index: 52; top: 8px; right: 8px; padding: 6px 9px; font-size: 11px; color: #e7f5f8; background: #102b39e8; border: 1px solid #69afc0; border-radius: 5px; opacity: 0; transition: opacity .15s ease; }
+.streamer-restore:hover,.streamer-restore:focus-visible { opacity: 1; }
+@media (hover: none) { .streamer-restore { opacity: .8; } }
+body.streamer-mode.streamer-clean .site-head,body.streamer-mode.streamer-clean .atlas-footer,body.streamer-mode.streamer-clean .streamer-layout { display: none; }
+body.streamer-mode.streamer-clean .streamer-window { min-height: 0; border: 0; border-radius: 0; box-shadow: none; resize: none; }
+body.streamer-mode.streamer-clean .streamer-titlebar,body.streamer-mode.streamer-clean .streamer-foot { display: none; }
+body.streamer-mode.streamer-clean #streamerOutput { cursor: move; }
 @media(max-width:700px) { .streamer-window { top: 112px; right: 10px; width: min(270px,calc(100vw - 20px)); height: 215px; } .atlas-buttons #streamerToggle { grid-column: 1 / -1; } }
 .streamer-layout[hidden] { display: none; }
 .streamer-layout { position: fixed; z-index: 60; right: 12px; bottom: 72px; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; max-width: calc(100% - 24px); padding: 6px; background: #102b39f2; border: 1px solid #6bb7c4; border-radius: 8px; box-shadow: 0 8px 25px #0009; }

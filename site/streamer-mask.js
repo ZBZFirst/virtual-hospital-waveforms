@@ -50,7 +50,8 @@ function currentCrop(){return cropBounds(regions,selected,$('framing').value,$('
 function fitWindowToCrop(){
   if(panel.hidden||!stream)return;
   const crop=currentCrop(),aspect=crop.width/crop.height;
-  const chrome=Math.max(44,panel.offsetHeight-output.getBoundingClientRect().height);
+  const chrome=document.body.classList.contains('streamer-clean')?0:
+    Math.max(44,panel.offsetHeight-output.getBoundingClientRect().height);
   const stage=document.getElementById('captureStage');
   const maxW=Math.max(1,Math.min(stage.clientWidth-16,720));
   const maxH=Math.max(1,Math.min(stage.clientHeight-16,600));
@@ -347,5 +348,5 @@ $('download').onclick=()=>{if(!downloadUrl)return;const link=document.createElem
 $('close').onclick=hideEditor;
 addEventListener('pagehide',()=>{stop();if(downloadUrl)URL.revokeObjectURL(downloadUrl);
   if(imageUrl)URL.revokeObjectURL(imageUrl);});
-window.StreamerMask={start,stop,showEditor,hideEditor,cameraError};
+window.StreamerMask={start,stop,showEditor,hideEditor,fitWindowToCrop,cameraError};
 })();

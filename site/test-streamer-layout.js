@@ -10,6 +10,9 @@ assert(html.indexOf('id="streamerTheme"')>html.indexOf('id="streamerHorizontal"'
 assert(!html.includes('<span>OBS Browser Source'));
 assert(css.includes('aspect-ratio: 16 / 9'));
 assert(css.includes('aspect-ratio: 9 / 16'));
+assert(html.includes('id="streamerClean"'));
+assert(html.includes('id="streamerRestore"'));
+assert(css.includes('streamer-clean .site-head'));
 
 const handlers=new Map(),elements=new Map(),storage=new Map();
 function element(id){
@@ -24,12 +27,13 @@ function element(id){
   return elements.get(id);
 }
 const bodyClasses=new Set();
-const body={dataset:{},classList:{add:value=>bodyClasses.add(value),remove:value=>bodyClasses.delete(value)}};
+const body={dataset:{},classList:{add:value=>bodyClasses.add(value),remove:value=>bodyClasses.delete(value),
+  contains:value=>bodyClasses.has(value),toggle:(value,enabled)=>enabled?bodyClasses.add(value):bodyClasses.delete(value)}};
 let stopped=false;
 let themeValue='original';
 const context=vm.createContext({
   $:element,document:{body,documentElement:{dataset:{}}},
-  window:{StreamerMask:{start:async()=>true,stop:()=>{stopped=true;},hideEditor:()=>{},showEditor:()=>{}},
+  window:{StreamerMask:{start:async()=>true,stop:()=>{stopped=true;},hideEditor:()=>{},showEditor:()=>{},fitWindowToCrop:()=>{}},
     ZeBeZoTheme:{getTheme:()=>themeValue,setTheme:value=>{themeValue=value;}}},
   localStorage:{getItem:key=>storage.get(key),setItem:(key,value)=>storage.set(key,value)},
   requestAnimationFrame:callback=>callback(),
@@ -55,6 +59,16 @@ function click(id){element(id).listeners.get('click')();}
   assert.equal(element('streamerHorizontal')['aria-pressed'],'true');
   element('streamerTheme').value='dark';element('streamerTheme').listeners.get('change')();
   assert.equal(themeValue,'dark','the grouped Theme control uses the site theme API');
+  click('streamerClean');
+  assert(bodyClasses.has('streamer-clean'));
+  assert.equal(element('streamerRestore').hidden,false);
+  assert.equal(element('streamerClean')['aria-pressed'],'true');
+  click('streamerRestore');
+  assert(!bodyClasses.has('streamer-clean'));
+  assert.equal(element('streamerRestore').hidden,true);
+  click('streamerClean');
+  handlers.get('keydown')({key:'Escape'});
+  assert(!bodyClasses.has('streamer-clean'));
   click('streamerToggle');
   assert(!bodyClasses.has('streamer-mode'));
   assert.equal(element('streamerLayout').hidden,true);

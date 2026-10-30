@@ -1910,7 +1910,7 @@ async function init() {
   try {
     const [manifest,campus]=await Promise.all([
       fetch('manifest.json').then(response=>{if(!response.ok)throw Error(`Manifest HTTP ${response.status}`);return response.json();}),
-      fetch('scene3d/campus_manifest_full_catalog.json?v=20261030-mask-crop1').then(response=>{if(!response.ok)throw Error(`Campus HTTP ${response.status}`);return response.json();})
+      fetch('scene3d/campus_manifest_full_catalog.json?v=20261030-clean-view1').then(response=>{if(!response.ok)throw Error(`Campus HTTP ${response.status}`);return response.json();})
     ]);
     state.entries=manifest.entries;
     fullCatalogById=new Map(campus.rooms.map(room=>[room.id,room]));
@@ -1985,6 +1985,7 @@ function loadBreathSequences(){
 function setupStreamerMode(){
   const panel=$('streamerWindow'),toggle=$('streamerToggle'),retry=$('streamerRetry');
   const handle=$('streamerDragHandle'),stage=$('captureStage'),layout=$('streamerLayout');
+  const clean=$('streamerClean'),restore=$('streamerRestore'),feed=$('streamerOutput');
   const horizontal=$('streamerHorizontal'),portrait=$('streamerPortrait'),theme=$('streamerTheme');
   let drag=null;
   function syncTheme(){theme.value=window.ZeBeZoTheme?.getTheme()||document.documentElement.dataset.zbTheme||'original';}
@@ -2013,9 +2014,20 @@ function setupStreamerMode(){
   horizontal.addEventListener('click',()=>setOrientation('horizontal'));
   portrait.addEventListener('click',()=>setOrientation('portrait'));
   addEventListener('resize',()=>requestAnimationFrame(clampCameraWindow));
+  function setClean(enabled){
+    document.body.classList.toggle('streamer-clean',enabled);
+    clean.setAttribute('aria-pressed',String(enabled));
+    restore.hidden=!enabled;
+    requestAnimationFrame(()=>{window.StreamerMask.fitWindowToCrop();clampCameraWindow();});
+  }
+  clean.addEventListener('click',()=>setClean(true));
+  restore.addEventListener('click',()=>setClean(false));
+  addEventListener('keydown',event=>{
+    if(event.key==='Escape'&&document.body.classList.contains('streamer-clean'))setClean(false);
+  });
   function close(){
     window.StreamerMask.stop();window.StreamerMask.hideEditor();panel.hidden=true;retry.hidden=true;
-    layout.hidden=true;document.body.classList.remove('streamer-mode');
+    setClean(false);layout.hidden=true;document.body.classList.remove('streamer-mode');
     toggle.textContent='Streamer mode';toggle.setAttribute('aria-pressed','false');
   }
   async function open(){
@@ -2032,22 +2044,25 @@ function setupStreamerMode(){
   $('streamerClose').addEventListener('click',close);
   retry.addEventListener('click',()=>window.StreamerMask.start());
   $('streamerEdit').addEventListener('click',()=>window.StreamerMask.showEditor());
-  handle.addEventListener('pointerdown',event=>{
-    if(event.target.closest('button'))return;
-    const rect=panel.getBoundingClientRect(),frame=stage.getBoundingClientRect();
-    drag={id:event.pointerId,x:event.clientX,y:event.clientY,left:rect.left-frame.left,top:rect.top-frame.top};
-    panel.style.left=`${drag.left}px`;panel.style.top=`${drag.top}px`;panel.style.right='auto';
-    handle.setPointerCapture(event.pointerId);panel.classList.add('is-dragging');
-  });
-  handle.addEventListener('pointermove',event=>{
-    if(!drag||event.pointerId!==drag.id)return;
-    const left=Math.max(0,Math.min(stage.clientWidth-panel.offsetWidth,drag.left+event.clientX-drag.x));
-    const top=Math.max(0,Math.min(stage.clientHeight-panel.offsetHeight,drag.top+event.clientY-drag.y));
-    panel.style.left=`${left}px`;panel.style.top=`${top}px`;
-  });
-  function endDrag(event){if(drag?.id===event.pointerId){drag=null;panel.classList.remove('is-dragging');}}
-  handle.addEventListener('pointerup',endDrag);
-  handle.addEventListener('pointercancel',endDrag);
+  for(const target of [handle,feed]){
+    target.addEventListener('pointerdown',event=>{
+      if(target===feed&&!document.body.classList.contains('streamer-clean'))return;
+      if(event.target.closest('button'))return;
+      const rect=panel.getBoundingClientRect(),frame=stage.getBoundingClientRect();
+      drag={id:event.pointerId,x:event.clientX,y:event.clientY,left:rect.left-frame.left,top:rect.top-frame.top};
+      panel.style.left=`${drag.left}px`;panel.style.top=`${drag.top}px`;panel.style.right='auto';
+      target.setPointerCapture(event.pointerId);panel.classList.add('is-dragging');
+    });
+    target.addEventListener('pointermove',event=>{
+      if(!drag||event.pointerId!==drag.id)return;
+      const left=Math.max(0,Math.min(stage.clientWidth-panel.offsetWidth,drag.left+event.clientX-drag.x));
+      const top=Math.max(0,Math.min(stage.clientHeight-panel.offsetHeight,drag.top+event.clientY-drag.y));
+      panel.style.left=`${left}px`;panel.style.top=`${top}px`;
+    });
+    function endDrag(event){if(drag?.id===event.pointerId){drag=null;panel.classList.remove('is-dragging');}}
+    target.addEventListener('pointerup',endDrag);
+    target.addEventListener('pointercancel',endDrag);
+  }
 }
 setupStreamerMode();
 init();
