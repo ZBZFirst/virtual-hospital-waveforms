@@ -46,9 +46,14 @@
     html.embedded #bar { top: 160px; max-width: 780px; max-height: 26vh; overflow: auto; }
     html.embedded #telemetryDetail { top: 140px; }
     html.embedded #help { bottom: 94px; }
-    @media(max-width:650px) { html.embedded #bar { top: 155px; max-height: 46vh; } html.embedded #telemetryDetail { top: 165px; } html.embedded #toggleControls { display: inline-block; margin-left: auto; } html.embedded body.controls-collapsed #bar > :not(strong):not(#toggleControls):not(#status) { display: none; } html.embedded body.controls-collapsed #bar { max-height: 100px; } }
-    #bar { max-width: 860px; display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 6px; padding: 9px 11px; overflow: visible; }
-    #bar > strong { margin: 0; }
+    @media(max-width:650px) { html.embedded #bar { top: 155px; width: calc(100vw - 12px); max-height: 46vh; } html.embedded #telemetryDetail { top: 165px; } html.embedded #toggleControls { display: inline-block; margin-left: auto; } html.embedded body.controls-collapsed #bar > :not(#barHeader):not(#status) { display: none; } html.embedded body.controls-collapsed #bar { max-height: 100px; } }
+    #bar { box-sizing: border-box; width: min(850px,calc(100vw - 28px)); max-width: none; right: auto; display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 6px; padding: 9px 11px; overflow: visible; }
+    #barHeader { display: flex; align-items: center; min-height: 20px; cursor: move; touch-action: none; user-select: none; }
+    #barHeader strong { margin: 0; }
+    #toolbarTabs { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 5px; }
+    .toolbar-tab { min-width: 0; padding: 6px 5px; font-size: 12px; }
+    .toolbar-tab[aria-selected="true"] { background: #23768b; border-color: #82d6dc; }
+    #bar .toolbar-row[hidden] { display: none; }
     .toolbar-row { display: flex; align-items: stretch; gap: 6px; min-width: 0; }
     #viewRow, #patientRow, #motionRow { flex: 0 0 36px; height: 36px; }
     .toolbar-row button { min-width: 0; }
@@ -68,18 +73,19 @@
     .tour-media #tourPlay { flex: 0 0 auto; white-space: nowrap; }
     .tour-media #tourTime { flex: 0 0 auto; min-width: 72px; text-align: right; }
     #status { flex-basis: auto; }
-    html.embedded #bar { max-width: 850px; max-height: none; overflow: visible; }
+    html.embedded #bar { max-height: none; overflow: visible; }
     @media(max-width:650px) {
       html.embedded #bar { max-height: 46vh; overflow: auto; }
       html.embedded body.controls-collapsed #bar { max-height: 100px; }
+      html.embedded body.controls-collapsed #bar > :not(#barHeader):not(#status) { display: none; }
       .toolbar-options { position: static; grid-template-columns: 1fr; }
       .toolbar-options button { white-space: normal; }
       #patientRow, #motionRow { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
       #viewRow, #patientRow, #motionRow { height: auto; flex-basis: auto; }
       #patientRow button, #motionRow > button { height: auto; min-height: 36px; }
       .tour-media { grid-column: 1 / -1; }
-      #toggleControls { position: absolute; right: 8px; top: 8px; }
-      #bar > strong { min-height: 38px; padding-right: 90px; }
+      #toggleControls { position: static; margin-left: auto; }
+      #barHeader { min-height: 38px; }
       html.embedded body.controls-collapsed #status { max-width: calc(100% - 94px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     }
   </style>
@@ -91,20 +97,20 @@
   <div id="view"></div>
   <div id="modelLoading" role="status" aria-live="polite" hidden><div class="model-loading-card"><strong id="modelLoadingTitle">Loading floor…</strong><progress id="modelLoadingBar" max="100" value="0" aria-label="3D model download progress"></progress><output id="modelLoadingAmount" aria-live="off">0%</output><small id="modelLoadingPhase">Downloading 3D models</small></div></div>
   <div id="bar">
-    <strong>ZeBeZo hospital campus</strong>
-    <button id="toggleControls" aria-expanded="false" aria-controls="bar">Controls ▾</button>
-    <div id="locationRow" class="toolbar-row" aria-label="Hospital location">
+    <div id="barHeader"><strong>ZeBeZo hospital campus</strong><button id="toggleControls" aria-expanded="false" aria-controls="bar">Controls ▾</button></div>
+    <div id="toolbarTabs" role="tablist" aria-label="Hospital controls"><button class="toolbar-tab" id="locationTab" type="button" role="tab" aria-selected="true" aria-controls="locationRow">Location</button><button class="toolbar-tab" id="viewTab" type="button" role="tab" aria-selected="false" aria-controls="viewRow">Views</button><button class="toolbar-tab" id="patientTab" type="button" role="tab" aria-selected="false" aria-controls="patientRow">Patient</button><button class="toolbar-tab" id="motionTab" type="button" role="tab" aria-selected="false" aria-controls="motionRow">Motion</button></div>
+    <div id="locationRow" class="toolbar-row" role="tabpanel" aria-labelledby="locationTab" aria-label="Hospital location">
       <details class="toolbar-picker" id="hospitalPicker"><summary id="hospitalPickerLabel">Hospital A</summary><div class="toolbar-options"><button data-hospital="A">Hospital A</button><button data-hospital="B">Hospital B</button><button data-hospital="C">Hospital C</button><button data-hospital="D">Hospital D</button><button data-hospital="E">Hospital E</button></div></details>
       <details class="toolbar-picker" id="floorPicker"><summary id="floorPickerLabel">Floor</summary><div class="toolbar-options"><button data-floor="1">Floor 1</button><button data-floor="2">Floor 2</button><button data-floor="3">Floor 3</button><button data-floor="4">Floor 4</button><button data-floor="5">Floor 5</button><button data-floor="6">Floor 6</button></div></details>
       <details class="toolbar-picker" id="roomPicker"><summary id="roomPickerLabel">Room</summary><div class="toolbar-options"><button data-room="1">Room 1</button><button data-room="2">Room 2</button><button data-room="3">Room 3</button><button data-room="4">Room 4</button><button data-room="5">Room 5</button><button data-room="6">Room 6</button></div></details>
     </div>
-    <div id="viewRow" class="toolbar-row" aria-label="Scene views">
+    <div id="viewRow" class="toolbar-row" role="tabpanel" aria-labelledby="viewTab" aria-label="Scene views" hidden>
       <button id="hospitalView" aria-pressed="false">Hospital view</button><button id="overview">Floor view</button><button id="walk" aria-pressed="false">Walk mode</button>
     </div>
-    <div id="patientRow" class="toolbar-row" aria-label="Patient and inspection controls">
+    <div id="patientRow" class="toolbar-row" role="tabpanel" aria-labelledby="patientTab" aria-label="Patient and inspection controls" hidden>
       <button id="previousPatient" aria-label="Previous patient">◀ Patient</button><button id="nextPatient" aria-label="Next patient">Patient ▶</button><button id="inspectTarget" aria-pressed="false">Inspect nursing cube</button><button id="openVital" hidden>Vital Waveforms</button><button id="openVent" hidden>Ventilator Waveforms</button>
     </div>
-    <div id="motionRow" class="toolbar-row" aria-label="Motion and tour controls">
+    <div id="motionRow" class="toolbar-row" role="tabpanel" aria-labelledby="motionTab" aria-label="Motion and tour controls" hidden>
       <button id="cubeAuto" aria-pressed="true">Pause rotation</button><button id="elevatorDoor" aria-pressed="false">Open elevator</button>
       <div class="tour-media" role="group" aria-label="Unit walk media controls"><button id="tourPlay">Play unit walk</button><input id="tourScrub" aria-label="Unit walking tour position" type="range" min="0" max="1" value="0"><output id="tourTime">0:00 / 0:00</output></div>
     </div>
@@ -122,6 +128,6 @@
     <div id="vitalCharts" class="vital-charts"><div class="vital-chart"><canvas id="vitalChart0" aria-label="ECG lead II waveform"></canvas></div><div class="vital-chart"><canvas id="vitalChart1" aria-label="Arterial pressure waveform"></canvas></div><div class="vital-chart"><canvas id="vitalChart2" aria-label="Central venous pressure waveform"></canvas></div><div class="vital-chart"><canvas id="vitalChart3" aria-label="Pulmonary arterial pressure waveform"></canvas></div></div>
     <small>Full PhysioNet MGH/MF source recording. Channels are shown only when present. <a href="https://physionet.org/content/mghdb/1.0.0/" target="_blank" rel="noopener" style="color:#9bdae9">Source and attribution</a></small>
   </section>
-  <script type="module" src="./viewer.js?v=20261030-clean-view1"></script>
+  <script type="module" src="./viewer.js?v=20261030-toolbar-tabs1"></script>
 </body>
 </html>

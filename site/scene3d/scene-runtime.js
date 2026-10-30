@@ -2015,6 +2015,54 @@ async function startWalk() {
 }
 
 // Source: scene3d/parts/events.js
+function setupToolbarTabsAndDrag(){
+  const bar=document.querySelector('#bar'),header=document.querySelector('#barHeader');
+  const tabs=[...document.querySelectorAll('.toolbar-tab')];
+  function selectTab(tab){
+    closeToolbarPickers();
+    for(const item of tabs){
+      const active=item===tab;
+      item.setAttribute('aria-selected',String(active));item.tabIndex=active?0:-1;
+      document.getElementById(item.getAttribute('aria-controls')).hidden=!active;
+    }
+    if(bar.style.left)clampBar(parseFloat(bar.style.left),parseFloat(bar.style.top));
+  }
+  for(const tab of tabs){
+    tab.addEventListener('click',()=>selectTab(tab));
+    tab.addEventListener('keydown',event=>{
+      let index=tabs.indexOf(tab);
+      if(event.key==='ArrowRight')index=(index+1)%tabs.length;
+      else if(event.key==='ArrowLeft')index=(index+tabs.length-1)%tabs.length;
+      else if(event.key==='Home')index=0;
+      else if(event.key==='End')index=tabs.length-1;
+      else return;
+      event.preventDefault();selectTab(tabs[index]);tabs[index].focus();
+    });
+  }
+  selectTab(tabs[0]);
+  let drag=null;
+  function clampBar(left,top){
+    bar.style.left=`${Math.max(0,Math.min(innerWidth-bar.offsetWidth,left))}px`;
+    bar.style.top=`${Math.max(0,Math.min(innerHeight-bar.offsetHeight,top))}px`;
+    bar.style.right='auto';
+  }
+  header.addEventListener('pointerdown',event=>{
+    if(event.button!==0||event.target.closest('button'))return;
+    const rect=bar.getBoundingClientRect();
+    drag={id:event.pointerId,x:event.clientX,y:event.clientY,left:rect.left,top:rect.top};
+    clampBar(rect.left,rect.top);header.setPointerCapture(event.pointerId);
+  });
+  header.addEventListener('pointermove',event=>{
+    if(drag?.id===event.pointerId)clampBar(drag.left+event.clientX-drag.x,drag.top+event.clientY-drag.y);
+  });
+  for(const type of ['pointerup','pointercancel'])header.addEventListener(type,event=>{
+    if(drag?.id===event.pointerId)drag=null;
+  });
+  addEventListener('resize',()=>{
+    if(bar.style.left)clampBar(parseFloat(bar.style.left),parseFloat(bar.style.top));
+  });
+}
+setupToolbarTabsAndDrag();
 document.querySelector('#walk').addEventListener('click', () => walkMode ? stopWalk() : startWalk());
 document.querySelector('#inspectTarget').addEventListener('click', () => {
   if(walkMode){tabletInspect=!tabletInspect;placeTablet();}
@@ -2521,8 +2569,8 @@ async function boot() {
   let catalogConfig;
   [meta, campusManifest, catalogConfig] = await Promise.all([
     fetch('./scene_meta.json').then(r => r.json()),
-    fetch('./campus_manifest_full_catalog.json?v=20261030-clean-view1').then(r=>r.json()),
-    fetch('./catalog_config.json?v=20261030-clean-view1').then(r=>r.json()),
+    fetch('./campus_manifest_full_catalog.json?v=20261030-toolbar-tabs1').then(r=>r.json()),
+    fetch('./catalog_config.json?v=20261030-toolbar-tabs1').then(r=>r.json()),
   ]);
   telemetryBase = new URL(catalogConfig.mgh_base,location.href).href;
   modelBase = new URL(catalogConfig.model_base || './',location.href).href;
