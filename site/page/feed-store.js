@@ -35,7 +35,7 @@ function feedData(entry){
   if(data){state.cache.delete(entry.name);state.cache.set(entry.name,data);return data;}
   data=SegmentedWaveform.create(state.segmentStore.index.feeds[entry.name]);
   state.cache.set(entry.name,data);
-  if(state.cache.size>8)state.cache.delete(state.cache.keys().next().value);
+  if(state.cache.size>18)state.cache.delete(state.cache.keys().next().value);
   return data;
 }
 function analyzeBrowser(data,complete,breath){

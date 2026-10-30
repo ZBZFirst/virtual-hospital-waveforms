@@ -46,17 +46,17 @@ function decodeWindowSample(sample, channel, count, parts) {
   return digital === -2048 ? null : digital;
 }
 
-function isCached(record, elapsed, leadSeconds = 0) {
+function isCached(record, elapsed, leadSeconds = 0, historySeconds = 8) {
   const clock = recordClock(record, elapsed);
-  return Boolean(record.parts) && clock - record.windows.length >= record.cacheFromClock
+  return Boolean(record.parts) && clock - Math.round(historySeconds * record.fs) >= record.cacheFromClock
     && clock + Math.floor(leadSeconds * record.fs) < record.cacheToClock;
 }
 
-async function fillRecordCache(record, elapsed) {
-  if (isCached(record, elapsed, 6)) return;
+async function fillRecordCache(record, elapsed, historySeconds = 8) {
+  if (isCached(record, elapsed, 6, historySeconds)) return;
   if (record.loading) return record.loading;
   const current = recordClock(record, elapsed);
-  const fromClock = current - record.windows.length;
+  const fromClock = current - Math.round(historySeconds * record.fs);
   const toClock = current + Math.round(record.fs * 16);
   const mod = n => ((n % record.samples) + record.samples) % record.samples;
   const first = mod(fromClock), last = mod(toClock);

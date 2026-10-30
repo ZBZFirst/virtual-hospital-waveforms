@@ -193,29 +193,15 @@ function roomAssignment(hospitalId, floor, room) {
 }
 
 function updateOpenFeedButton() {
-  const button=document.querySelector('#openFeed');
   const room=walkMode?walkRoom:activeRoom;
   const assignment=room?roomAssignment(activeHospital,activeFloor,room):null;
-  button.hidden=!(assignment?.patient_id && (assignment.uc_davis_recording || assignment.telemetry_record));
-  button.disabled=button.hidden;
-  button.textContent=assignment?.uc_davis_recording?'Open full UC Davis waveform':
-    assignment?.telemetry_record?'Open full MGH telemetry':'Open full waveform';
-}
-
-async function paintTelemetryDetail(now) {
-  if (!telemetryDetail || now-lastDetailPaint<80) return;
-  lastDetailPaint=now;
-  const {assignment,canvas}=telemetryDetail;
-  const elapsed=exportElapsedSeconds ?? (now-playbackStart)/1000;
-  try {
-    const record=await getRecord(assignment.telemetry_record);
-    if (!telemetryDetail || telemetryDetail.assignment!==assignment) return;
-    await fillRecordCache(record,elapsed);
-    if (!telemetryDetail || telemetryDetail.assignment!==assignment || !isCached(record,elapsed)) return;
-    const start=recordClock(record,elapsed)-record.windows.length;
-    for(let j=0;j<record.windows.length;j++)record.windows[j]=((start+j)%record.samples+record.samples)%record.samples;
-    drawMonitor(canvas,assignment.room,record,elapsed);
-  } catch(error) { showError(String(error)); }
+  const visible=Boolean(assignment?.patient_id);
+  for(const [id,source,label] of [['openVital','telemetry_record','vital'],['openVent','uc_davis_recording','ventilator']]){
+    const button=document.querySelector(`#${id}`);
+    button.hidden=!visible;
+    button.disabled=!visible;
+    button.title=visible&&!assignment?.[source]?`No ${label} waveform source for this patient`:'';
+  }
 }
 
 function activateHospital(hospitalId) {

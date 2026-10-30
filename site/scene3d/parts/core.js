@@ -97,27 +97,32 @@ function updateUcVentWindow(message) {
     const assignment=roomById.get(window.id);
     if(!assignment?.uc_davis_recording || assignment.uc_davis_recording!==window.recording ||
        !Array.isArray(window.flow) || !Array.isArray(window.pressure) ||
-       window.flow.length!==50 || window.pressure.length!==50)continue;
+       ![10,50].includes(window.sourceRate) ||
+       window.flow.length!==window.sourceRate*5 || window.pressure.length!==window.sourceRate*5)continue;
     const flow=[],pressure=[],volume=[];
     let cumulative=0,previous=0;
-    for(let index=0;index<50;index++)for(let step=0;step<5;step++){
-      const a=step/5;
-      const next=Math.min(index+1,49);
-      const f=Number.isFinite(window.flow[index])&&Number.isFinite(window.flow[next])?
+    const factor=50/window.sourceRate;
+    for(let index=0;index<window.flow.length;index++)for(let step=0;step<factor;step++){
+      const a=step/factor;
+      const next=Math.min(index+1,window.flow.length-1);
+      const f=Number.isFinite(window.flow[index])&&(factor===1||Number.isFinite(window.flow[next]))?
         THREE.MathUtils.lerp(window.flow[index],window.flow[next],a):null;
-      const p=Number.isFinite(window.pressure[index])&&Number.isFinite(window.pressure[next])?
+      const p=Number.isFinite(window.pressure[index])&&(factor===1||Number.isFinite(window.pressure[next]))?
         THREE.MathUtils.lerp(window.pressure[index],window.pressure[next],a):null;
-      const sourceVolume=Array.isArray(window.volume)&&Number.isFinite(window.volume[index])&&Number.isFinite(window.volume[next])?
+      const sourceVolume=Array.isArray(window.volume)&&Number.isFinite(window.volume[index])&&
+        (factor===1||Number.isFinite(window.volume[next]))?
         THREE.MathUtils.lerp(window.volume[index],window.volume[next],a):null;
       if(f!==null && previous<=1 && f>1)cumulative=0;
       cumulative=f===null?0:cumulative+f/3;
-      flow.push(f);pressure.push(p);volume.push(sourceVolume??(f===null?null:cumulative));
+      flow.push(f);pressure.push(p);
+      volume.push(Array.isArray(window.volume)?sourceVolume:f===null?null:cumulative);
       previous=f??0;
     }
     const cycle=values=>values.concat(values,values);
     const stable=window.ranges;
     const previousRecord=ucVentByRoom.get(assignment.id);
-    const record={room:assignment.room,recording:window.recording,external:true,sourceSeconds:window.sourceSeconds,
+    const record={room:assignment.room,recording:window.recording,external:true,
+      sourceRate:window.sourceRate,sourceSeconds:window.sourceSeconds,
       pressure_cm_h2o:cycle(pressure),flow_l_min:cycle(flow),volume_ml:cycle(volume),
       pressureRange:stable?.pressure || previousRecord?.pressureRange || range(pressure,2),
       flowRange:stable?.flow || previousRecord?.flowRange || range(flow,5),

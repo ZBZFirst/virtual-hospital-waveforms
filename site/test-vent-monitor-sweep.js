@@ -20,7 +20,7 @@ const c = {
 };
 const screen = { sweepStep: 0, canvas: { getContext: () => c } };
 const record = time => ({
-  room: 1, recording: 'uc-001', external: true, sourceSeconds: time,
+  room: 1, recording: 'uc-001', external: true, sourceRate: 50, sourceSeconds: time,
   pressure_cm_h2o: Array(750).fill(20), flow_l_min: Array(750).fill(5),
   volume_ml: Array(750).fill(400),
   pressureRange: [0, 50], flowRange: [-60, 60], volumeRange: [0, 800],

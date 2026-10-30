@@ -12,21 +12,29 @@ async function changePatient(step){
 }
 document.querySelector('#previousPatient').addEventListener('click', () => changePatient(-1));
 document.querySelector('#nextPatient').addEventListener('click', () => changePatient(1));
-document.querySelector('#openFeed').addEventListener('click',()=>{
+document.querySelector('#openVital').addEventListener('click',()=>{
   const room=walkMode?walkRoom:activeRoom;
   const assignment=room?roomAssignment(activeHospital,activeFloor,room):null;
-  if(assignment?.telemetry_record){
-    const panel=document.querySelector('#telemetryDetail');
-    telemetryDetail={assignment,canvas:document.querySelector('#telemetryCanvas')};
-    document.querySelector('#telemetryTitle').textContent=`${assignment.id} · ${assignment.telemetry_record.toUpperCase()} · PhysioNet telemetry`;
-    panel.classList.add('open');
-    paintTelemetryDetail(performance.now());
-    return;
-  }
-  if(!assignment?.uc_davis_recording)return;
+  if(assignment?.telemetry_record)openVitalDetail(assignment);
+});
+document.querySelector('#openVent').addEventListener('click',()=>{
+  const room=walkMode?walkRoom:activeRoom;
+  const assignment=room?roomAssignment(activeHospital,activeFloor,room):null;
+  if(!assignment?.uc_davis_recording){if(assignment?.patient_id)openVitalDetail(assignment,'vent');return;}
   parent.postMessage({type:'zebezo-open-recording',recording:assignment.uc_davis_recording,
     roomId:assignment.id},location.origin);
 });
+document.querySelector('#vitalTab').addEventListener('click',()=>selectVitalDetailTab('vital'));
+document.querySelector('#ventTab').addEventListener('click',()=>selectVitalDetailTab('vent'));
+document.querySelector('#vitalPlay').addEventListener('click',()=>{
+  if(!telemetryDetail)return;
+  const sceneElapsed=exportElapsedSeconds??(performance.now()-playbackStart)/1000;
+  if(telemetryDetail.paused)telemetryDetail.offset=sceneElapsed-telemetryDetail.elapsed;
+  else telemetryDetail.elapsed=sceneElapsed-telemetryDetail.offset;
+  telemetryDetail.paused=!telemetryDetail.paused;
+  document.querySelector('#vitalPlay').textContent=telemetryDetail.paused?'Resume':'Pause';
+});
+document.querySelector('#vitalWindow').addEventListener('change',()=>{lastDetailPaint=0;if(telemetryDetail)telemetryDetail.ranges=null;});
 document.querySelector('#closeTelemetry').addEventListener('click',()=>{
   telemetryDetail=null;
   document.querySelector('#telemetryDetail').classList.remove('open');
@@ -49,6 +57,10 @@ document.addEventListener('mousemove', event => {
 });
 document.addEventListener('keydown', event => {
   const key = event.key.toLowerCase();
+  if(telemetryDetail){
+    if(key==='escape'){document.querySelector('#closeTelemetry').click();event.preventDefault();}
+    return;
+  }
   if (walkMode && ['w', 'a', 's', 'd', 'shift'].includes(key)) { movementKeys.add(key); event.preventDefault(); }
   if (walkMode && key === 'e' && !event.repeat) { toggleElevatorDoor(); event.preventDefault(); }
   if (walkMode && key === 'i' && !event.repeat) { document.querySelector('#inspectTarget').click(); event.preventDefault(); }

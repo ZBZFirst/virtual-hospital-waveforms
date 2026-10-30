@@ -26,10 +26,16 @@
     .model-loading-card output { display: block; font-variant-numeric: tabular-nums; color: #d6f2f5; }
     .model-loading-card small { display: block; margin-top: 7px; color: #a9cad3; }
     #cubeHint { position: fixed; z-index: 4; display: none; pointer-events: none; color: #e5f8fb; background: #0b2730ed; border: 1px solid #5caabc; border-radius: 5px; padding: 5px 8px; font-size: 12px; }
-    #telemetryDetail { position: fixed; inset: 4vh 4vw; z-index: 8; display: none; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid #52707c; border-radius: 10px; background: #10242af5; box-shadow: 0 10px 50px #000a; }
+    #telemetryDetail { position: fixed; inset: 4vh 4vw; z-index: 8; display: none; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid #52707c; border-radius: 10px; background: #10242af5; box-shadow: 0 10px 50px #000a; overflow: auto; }
     #telemetryDetail.open { display: flex; }
     #telemetryDetail header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-    #telemetryDetail canvas { width: 100%; min-height: 0; flex: 1; object-fit: contain; background: #08191f; }
+    #telemetryDetail .vital-charts { display: grid; gap: 8px; overflow: auto; min-height: 0; }
+    #telemetryDetail .vital-charts[hidden],#telemetryDetail .vital-controls[hidden],#vitalNoSource[hidden] { display: none; }
+    #vitalNoSource { padding: 32px; border: 1px solid #315565; border-radius: 7px; color: #afcdd4; }
+    #telemetryDetail .vital-chart { min-width: 0; padding: 7px; border: 1px solid #315565; border-radius: 7px; background: #0b1f2a; }
+    #telemetryDetail canvas { display: block; width: 100%; height: 180px; background: #08191f; }
+    #telemetryDetail .vital-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    #telemetryDetail .vital-controls output { margin-left: auto; color: #a7cbd2; }
     #telemetryDetail small { color: #afcdd4; }
     @media(max-width:650px) { #bar { top: 6px; left: 6px; right: 6px; gap: 5px; padding: 8px; max-height: 32vh; overflow: auto; } button { padding: 6px; } #help { font-size: 11px; } }
     html.embedded #bar { top: 160px; max-width: 780px; max-height: 26vh; overflow: auto; }
@@ -50,7 +56,7 @@
     .toolbar-options { position: absolute; z-index: 6; top: calc(100% + 4px); left: 0; min-width: 100%; display: grid; grid-template-columns: repeat(2,max-content); gap: 4px; padding: 6px; border: 1px solid #5a8997; border-radius: 6px; background: #132731; box-shadow: 0 8px 22px #0008; }
     .toolbar-options button { white-space: nowrap; }
     #viewRow button, #patientRow button { flex: 1 1 0; }
-    #openFeed[hidden] { display: none; }
+    #openVital[hidden],#openVent[hidden] { display: none; }
     #motionRow > button { flex: 0 0 auto; }
     .tour-media { display: flex; flex: 1 1 auto; align-items: center; gap: 7px; min-width: 0; padding: 2px 5px; border: 1px solid #456a76; border-radius: 6px; }
     .tour-media #tourScrub { flex: 1 1 auto; min-width: 80px; width: auto; }
@@ -91,7 +97,7 @@
       <button id="hospitalView" aria-pressed="false">Hospital view</button><button id="overview">Floor view</button><button id="walk" aria-pressed="false">Walk mode</button>
     </div>
     <div id="patientRow" class="toolbar-row" aria-label="Patient and inspection controls">
-      <button id="previousPatient" aria-label="Previous patient">◀ Patient</button><button id="nextPatient" aria-label="Next patient">Patient ▶</button><button id="inspectTarget" aria-pressed="false">Inspect nursing cube</button><button id="openFeed" hidden>Open full waveform</button>
+      <button id="previousPatient" aria-label="Previous patient">◀ Patient</button><button id="nextPatient" aria-label="Next patient">Patient ▶</button><button id="inspectTarget" aria-pressed="false">Inspect nursing cube</button><button id="openVital" hidden>Vital Waveforms</button><button id="openVent" hidden>Ventilator Waveforms</button>
     </div>
     <div id="motionRow" class="toolbar-row" aria-label="Motion and tour controls">
       <button id="cubeAuto" aria-pressed="true">Pause rotation</button><button id="elevatorDoor" aria-pressed="false">Open elevator</button>
@@ -102,11 +108,13 @@
   <div id="help">Drag to orbit · wheel to zoom · right drag to pan · select a floor and room above</div>
   <div id="error"></div>
   <div id="cubeHint"></div>
-  <section id="telemetryDetail" role="dialog" aria-modal="true" aria-label="PhysioNet telemetry detail">
-    <header><strong id="telemetryTitle">PhysioNet telemetry</strong><button id="closeTelemetry">Close</button></header>
-    <canvas id="telemetryCanvas" width="1200" height="720"></canvas>
-    <small>Full PhysioNet MGH/MF source recording. Channels are shown only when present in the source. <a href="https://physionet.org/content/mghdb/1.0.0/" target="_blank" rel="noopener" style="color:#9bdae9">Source and attribution</a></small>
+  <section id="telemetryDetail" role="dialog" aria-modal="true" aria-label="Patient vital waveform detail">
+    <header><strong id="telemetryTitle">Vital Waveforms</strong><button id="closeTelemetry">Close</button></header>
+    <div class="vital-controls"><button id="vitalTab" type="button" aria-pressed="true">Vital Waveforms</button><button id="ventTab" type="button" aria-pressed="false">Ventilator Waveforms</button><span id="vitalPlaybackControls"><button id="vitalPlay" type="button">Pause</button><label>Window <select id="vitalWindow"><option value="8">8 s</option><option value="15">15 s</option><option value="30" selected>30 s</option></select></label></span><output id="vitalProgress">Loading source waveform…</output></div>
+    <p id="vitalNoSource" hidden></p>
+    <div id="vitalCharts" class="vital-charts"><div class="vital-chart"><canvas id="vitalChart0" aria-label="ECG lead II waveform"></canvas></div><div class="vital-chart"><canvas id="vitalChart1" aria-label="Arterial pressure waveform"></canvas></div><div class="vital-chart"><canvas id="vitalChart2" aria-label="Central venous pressure waveform"></canvas></div><div class="vital-chart"><canvas id="vitalChart3" aria-label="Pulmonary arterial pressure waveform"></canvas></div></div>
+    <small>Full PhysioNet MGH/MF source recording. Channels are shown only when present. <a href="https://physionet.org/content/mghdb/1.0.0/" target="_blank" rel="noopener" style="color:#9bdae9">Source and attribution</a></small>
   </section>
-  <script type="module" src="./viewer.js?v=20261030-stable-sweep1"></script>
+  <script type="module" src="./viewer.js?v=20261030-full-waveforms1"></script>
 </body>
 </html>

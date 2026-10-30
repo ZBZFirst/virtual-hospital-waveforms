@@ -46,6 +46,7 @@ function makeFloorBadge(level) {
 function drawVentScreen(canvas, record, elapsed, screen) {
   const c = canvas.getContext('2d');
   const reset = !screen || !record.external || screen.sweepRecording !== record.recording ||
+    screen.sweepRate !== record.sourceRate ||
     !Number.isFinite(screen.lastSourceSeconds) || record.sourceSeconds < screen.lastSourceSeconds ||
     record.sourceSeconds - screen.lastSourceSeconds > 5;
   if (reset) { c.fillStyle = '#07181e'; c.fillRect(0, 0, 640, 400); }
@@ -54,7 +55,7 @@ function drawVentScreen(canvas, record, elapsed, screen) {
   c.fillStyle = '#cce4e7'; c.font = 'bold 19px system-ui';
   c.fillText(`VENTILATOR · ROOM ${String(record.room).padStart(2, '0')}`, 18, 28);
   c.fillStyle = '#7fa5aa'; c.font = '12px system-ui';
-  c.fillText(record.external?'UC Davis 10 Hz visual track · full 50 Hz feed in detail':
+  c.fillText(record.external?`UC Davis ${record.sourceRate} Hz source track`:
     'Recorded pressure + flow · calculated volume · 10 s loop', 18, 46);
   }
   const rows = [
@@ -71,6 +72,7 @@ function drawVentScreen(canvas, record, elapsed, screen) {
     screen.sweepStep = 0;
     screen.sweepPoints = Array(3).fill(null);
     screen.sweepRecording = record.recording;
+    screen.sweepRate = record.sourceRate;
   }
   for (let j = 0; j < 3; j++) {
     const [key, label, color, range] = rows[j];

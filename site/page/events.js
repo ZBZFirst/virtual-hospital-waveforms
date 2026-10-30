@@ -52,6 +52,7 @@ function setupEvents() {
     if(event.data?.type==='zebezo-scene-status')sceneLoading(event.data.status,event.data.message);
     if(event.data?.type==='zebezo-scene-progress')sceneTransfer(event.data);
     if(event.data?.type==='zebezo-scene-location')syncSceneLocation(event.data);
+    if(event.data?.type==='zebezo-cube-face')requestSceneFloor(event.data.hospital,event.data.floor,event.data.quality);
     if(event.data?.type==='zebezo-open-recording'){
       const entry=state.entries.find(item=>item.name===event.data.recording);
       if(entry)selectEntry(entry);
@@ -176,6 +177,25 @@ function setupEvents() {
   els.window.addEventListener('change',drawAll);
   $('room-feed-review').addEventListener('click',()=>setRoomMode('review'));
   $('room-feed-live').addEventListener('click',()=>setRoomMode('live'));
+  let patientVentWasRunning=false,patientVentWasPlaying=false;
+  $('patientVitalTab').addEventListener('click',()=>{
+    if($('patientWaveformTabs').hidden || !$('patientNoVital').hidden)return;
+    patientVentWasRunning=window.RoomLive.isRunning();
+    patientVentWasPlaying=state.active;
+    window.RoomLive.pause();state.active=false;state.lastFrame=0;
+    els.waveform.hidden=true;$('patientNoVital').hidden=false;
+    $('patientVitalTab').classList.add('selected');$('patientVitalTab').setAttribute('aria-pressed','true');
+    $('patientVentTab').classList.remove('selected');$('patientVentTab').setAttribute('aria-pressed','false');
+  });
+  $('patientVentTab').addEventListener('click',()=>{
+    if($('patientWaveformTabs').hidden || $('patientNoVital').hidden)return;
+    $('patientNoVital').hidden=true;els.waveform.hidden=false;
+    $('patientVitalTab').classList.remove('selected');$('patientVitalTab').setAttribute('aria-pressed','false');
+    $('patientVentTab').classList.add('selected');$('patientVentTab').setAttribute('aria-pressed','true');
+    if(patientVentWasRunning)window.RoomLive.start();
+    if(patientVentWasPlaying){state.active=true;state.lastFrame=0;}
+    drawAll();
+  });
   document.querySelector('.room-optional').addEventListener('toggle',drawAll);
   els.volumeToggle.addEventListener('change',()=>{els.volumeCard.hidden=!els.volumeToggle.checked;drawAll();});
   els.pathAxis.addEventListener('change',()=>{els.pathLabel.textContent=els.pathAxis.value==='volume'?'time · flow · calculated volume':'time · flow · pressure';drawPath();});
@@ -194,11 +214,6 @@ function syncSceneLocation(locationData){
   const {hospital,floor}=locationData;
   loadPreviewForFloor(hospital,floor).catch(()=>{});
   floorWarmTimer=setTimeout(()=>{
-    if(!state.segmentStore)return;
-    const names=state.entries.filter(entry=>{
-      const room=fullCatalogByRecording.get(entry.name);
-      return room?.hospital_id===hospital&&room.floor===floor;
-    }).map(entry=>entry.name);
-    state.segmentStore.warmFirst(names,2).catch(()=>{});
+    if(state.segmentStore)warmSceneFloor(hospital,floor).catch(error=>console.warn('Scene waveform preparation failed:',error));
   },900);
 }

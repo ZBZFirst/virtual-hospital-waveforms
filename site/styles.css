@@ -137,6 +137,12 @@ body { overflow: hidden; }
 .overlay { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; background: #030b12bd; backdrop-filter: blur(4px); padding: 16px; }
 .popup { box-shadow: 0 20px 70px #000a; }
 #detailOverlay { perspective: 1100px; }
+.patient-waveform-tabs { display: flex; gap: 8px; margin: 10px 0; }
+.patient-waveform-tabs[hidden] { display: none; }
+.patient-waveform-tabs button.selected { border-color: #58ced9; background: #1f6274; color: #edffff; }
+.patient-waveform-tabs button:disabled { opacity: .7; cursor: default; }
+.patient-no-source { padding: 24px; border: 1px solid #315565; border-radius: 8px; color: #afcdd4; }
+.patient-no-source[hidden] { display: none; }
 #detailOverlay .popup { transform-origin: right center; backface-visibility: hidden; }
 #detailOverlay.detail-enter { animation: detail-backdrop-in 440ms ease-out both; }
 #detailOverlay.detail-enter .popup { animation: detail-panel-in 440ms cubic-bezier(.22,1,.36,1) both; }

@@ -100,27 +100,32 @@ function updateUcVentWindow(message) {
     const assignment=roomById.get(window.id);
     if(!assignment?.uc_davis_recording || assignment.uc_davis_recording!==window.recording ||
        !Array.isArray(window.flow) || !Array.isArray(window.pressure) ||
-       window.flow.length!==50 || window.pressure.length!==50)continue;
+       ![10,50].includes(window.sourceRate) ||
+       window.flow.length!==window.sourceRate*5 || window.pressure.length!==window.sourceRate*5)continue;
     const flow=[],pressure=[],volume=[];
     let cumulative=0,previous=0;
-    for(let index=0;index<50;index++)for(let step=0;step<5;step++){
-      const a=step/5;
-      const next=Math.min(index+1,49);
-      const f=Number.isFinite(window.flow[index])&&Number.isFinite(window.flow[next])?
+    const factor=50/window.sourceRate;
+    for(let index=0;index<window.flow.length;index++)for(let step=0;step<factor;step++){
+      const a=step/factor;
+      const next=Math.min(index+1,window.flow.length-1);
+      const f=Number.isFinite(window.flow[index])&&(factor===1||Number.isFinite(window.flow[next]))?
         THREE.MathUtils.lerp(window.flow[index],window.flow[next],a):null;
-      const p=Number.isFinite(window.pressure[index])&&Number.isFinite(window.pressure[next])?
+      const p=Number.isFinite(window.pressure[index])&&(factor===1||Number.isFinite(window.pressure[next]))?
         THREE.MathUtils.lerp(window.pressure[index],window.pressure[next],a):null;
-      const sourceVolume=Array.isArray(window.volume)&&Number.isFinite(window.volume[index])&&Number.isFinite(window.volume[next])?
+      const sourceVolume=Array.isArray(window.volume)&&Number.isFinite(window.volume[index])&&
+        (factor===1||Number.isFinite(window.volume[next]))?
         THREE.MathUtils.lerp(window.volume[index],window.volume[next],a):null;
       if(f!==null && previous<=1 && f>1)cumulative=0;
       cumulative=f===null?0:cumulative+f/3;
-      flow.push(f);pressure.push(p);volume.push(sourceVolume??(f===null?null:cumulative));
+      flow.push(f);pressure.push(p);
+      volume.push(Array.isArray(window.volume)?sourceVolume:f===null?null:cumulative);
       previous=f??0;
     }
     const cycle=values=>values.concat(values,values);
     const stable=window.ranges;
     const previousRecord=ucVentByRoom.get(assignment.id);
-    const record={room:assignment.room,recording:window.recording,external:true,sourceSeconds:window.sourceSeconds,
+    const record={room:assignment.room,recording:window.recording,external:true,
+      sourceRate:window.sourceRate,sourceSeconds:window.sourceSeconds,
       pressure_cm_h2o:cycle(pressure),flow_l_min:cycle(flow),volume_ml:cycle(volume),
       pressureRange:stable?.pressure || previousRecord?.pressureRange || range(pressure,2),
       flowRange:stable?.flow || previousRecord?.flowRange || range(flow,5),
@@ -299,6 +304,7 @@ function makeFloorBadge(level) {
 function drawVentScreen(canvas, record, elapsed, screen) {
   const c = canvas.getContext('2d');
   const reset = !screen || !record.external || screen.sweepRecording !== record.recording ||
+    screen.sweepRate !== record.sourceRate ||
     !Number.isFinite(screen.lastSourceSeconds) || record.sourceSeconds < screen.lastSourceSeconds ||
     record.sourceSeconds - screen.lastSourceSeconds > 5;
   if (reset) { c.fillStyle = '#07181e'; c.fillRect(0, 0, 640, 400); }
@@ -307,7 +313,7 @@ function drawVentScreen(canvas, record, elapsed, screen) {
   c.fillStyle = '#cce4e7'; c.font = 'bold 19px system-ui';
   c.fillText(`VENTILATOR · ROOM ${String(record.room).padStart(2, '0')}`, 18, 28);
   c.fillStyle = '#7fa5aa'; c.font = '12px system-ui';
-  c.fillText(record.external?'UC Davis 10 Hz visual track · full 50 Hz feed in detail':
+  c.fillText(record.external?`UC Davis ${record.sourceRate} Hz source track`:
     'Recorded pressure + flow · calculated volume · 10 s loop', 18, 46);
   }
   const rows = [
@@ -324,6 +330,7 @@ function drawVentScreen(canvas, record, elapsed, screen) {
     screen.sweepStep = 0;
     screen.sweepPoints = Array(3).fill(null);
     screen.sweepRecording = record.recording;
+    screen.sweepRate = record.sourceRate;
   }
   for (let j = 0; j < 3; j++) {
     const [key, label, color, range] = rows[j];
@@ -661,6 +668,7 @@ function setCubeHover(face,event) {
 function setGrandCubeFocused(focused) {
   if(!grandCube)return;
   grandCube.focused=focused;
+  if(focused)grandCube.faces.forEach(face=>{face.lastSourceRequest=0;});
   grandCube.targetScale=focused?1:0.25;
   if(!focused)setCubeHover(null);
 }
@@ -830,9 +838,14 @@ function drawCubeFaces(elapsed, now, frustum) {
     const normal=new THREE.Vector3(0,0,1).applyQuaternion(face.mesh.getWorldQuaternion(new THREE.Quaternion()));
     if(normal.dot(camera.position.clone().sub(center))<=0.02)continue;
     if(!frustum.intersectsBox(new THREE.Box3().setFromObject(face.mesh)))continue;
+    if(embedded && (!face.lastSourceRequest || now-face.lastSourceRequest>2000)){
+      parent.postMessage({type:'zebezo-cube-face',hospital:activeHospital,floor:face.floor,
+        quality:grandCube.focused?'full':'preview'},location.origin);
+      face.lastSourceRequest=now;
+    }
     if((!telemetryReady[face.floor-1] || floorRecords[face.floor-1]?.some(r=>r&&!isCached(r,elapsed))) &&
       campusManifest.rooms.some(room=>room.hospital_id===activeHospital&&room.floor===face.floor&&room.telemetry_record))ensureTelemetryCaches(face.floor);
-    if(now-face.lastDrawTime>=80)drawCubeFace(face,elapsed,now);
+    if(now-face.lastDrawTime>=(grandCube.focused?33:80))drawCubeFace(face,elapsed,now);
   }
 }
 
@@ -1058,17 +1071,17 @@ function decodeWindowSample(sample, channel, count, parts) {
   return digital === -2048 ? null : digital;
 }
 
-function isCached(record, elapsed, leadSeconds = 0) {
+function isCached(record, elapsed, leadSeconds = 0, historySeconds = 8) {
   const clock = recordClock(record, elapsed);
-  return Boolean(record.parts) && clock - record.windows.length >= record.cacheFromClock
+  return Boolean(record.parts) && clock - Math.round(historySeconds * record.fs) >= record.cacheFromClock
     && clock + Math.floor(leadSeconds * record.fs) < record.cacheToClock;
 }
 
-async function fillRecordCache(record, elapsed) {
-  if (isCached(record, elapsed, 6)) return;
+async function fillRecordCache(record, elapsed, historySeconds = 8) {
+  if (isCached(record, elapsed, 6, historySeconds)) return;
   if (record.loading) return record.loading;
   const current = recordClock(record, elapsed);
-  const fromClock = current - record.windows.length;
+  const fromClock = current - Math.round(historySeconds * record.fs);
   const toClock = current + Math.round(record.fs * 16);
   const mod = n => ((n % record.samples) + record.samples) % record.samples;
   const first = mod(fromClock), last = mod(toClock);
@@ -1162,6 +1175,134 @@ function drawTelemetryFrame(now, elapsed, frustum) {
     status.textContent = `Hospital ${activeHospital} · Floor ${floor} · 6 rooms · recordings · ${Math.floor(elapsed)} s`;
   }
   lastTelemetryPaint = now;
+}
+
+// Source: scene3d/parts/vital-detail.js
+function openVitalDetail(assignment, source='vital') {
+  const panel=document.querySelector('#telemetryDetail');
+  telemetryDetail={assignment,source,paused:false,elapsed:null,offset:0};
+  movementKeys.clear();
+  document.querySelector('#telemetryTitle').textContent=`${assignment.id} · Patient Waveforms`;
+  document.querySelector('#vitalPlay').textContent='Pause';
+  document.querySelector('#vitalProgress').textContent='Loading full source waveform…';
+  panel.classList.add('open');
+  document.querySelector('#closeTelemetry').focus();
+  selectVitalDetailTab(source);
+  paintTelemetryDetail(performance.now());
+}
+
+function selectVitalDetailTab(source) {
+  if(!telemetryDetail)return;
+  const assignment=telemetryDetail.assignment;
+  if(source==='vent' && assignment.uc_davis_recording){
+    document.querySelector('#telemetryDetail').classList.remove('open');
+    telemetryDetail=null;
+    parent.postMessage({type:'zebezo-open-recording',recording:assignment.uc_davis_recording,roomId:assignment.id},location.origin);
+    return;
+  }
+  telemetryDetail.source=source;
+  const vital=source==='vital';
+  for(const [id,selected] of [['vitalTab',vital],['ventTab',!vital]]){
+    const button=document.querySelector(`#${id}`);
+    button.classList.toggle('active',selected);
+    button.setAttribute('aria-pressed',String(selected));
+  }
+  const hasSource=vital?Boolean(assignment.telemetry_record):Boolean(assignment.uc_davis_recording);
+  document.querySelector('#vitalCharts').hidden=!vital||!hasSource;
+  document.querySelector('#vitalPlaybackControls').hidden=!vital||!hasSource;
+  const empty=document.querySelector('#vitalNoSource');
+  empty.hidden=hasSource;
+  if(!hasSource){
+    empty.textContent=`No ${vital?'vital':'ventilator'} waveform recording is assigned to this patient.`;
+    document.querySelector('#vitalProgress').textContent='No source for this patient';
+  } else document.querySelector('#vitalProgress').textContent='Loading full source waveform…';
+}
+
+function vitalDetailRanges(record, elapsed, seconds) {
+  const end=recordClock(record,elapsed),start=end-Math.round(seconds*record.fs);
+  return channels.map(channel=>{
+    const info=record.channels[channel.key.toLowerCase()];
+    if(!info)return [channel.min,channel.max];
+    let low=Infinity,high=-Infinity;
+    for(let clock=start;clock<end;clock++){
+      const sample=((clock%record.samples)+record.samples)%record.samples;
+      const digital=decodeWindowSample(sample,info.index,record.count,record.parts);
+      if(digital===null)continue;
+      const value=(digital-info.baseline)/info.gain;
+      low=Math.min(low,value);high=Math.max(high,value);
+    }
+    if(!Number.isFinite(low))return [channel.min,channel.max];
+    const pad=Math.max((high-low)*.08,channel.key==='ART'?10:2);
+    return [low-pad,high+pad];
+  });
+}
+
+function drawVitalChart(canvas, record, channel, range, elapsed, seconds) {
+  const pixelRatio=Math.min(devicePixelRatio||1,2);
+  const width=Math.max(360,Math.round(canvas.clientWidth*pixelRatio));
+  const height=Math.round(180*pixelRatio);
+  if(canvas.width!==width || canvas.height!==height){canvas.width=width;canvas.height=height;}
+  const c=canvas.getContext('2d');
+  const w=width/pixelRatio,h=height/pixelRatio;
+  c.setTransform(pixelRatio,0,0,pixelRatio,0,0);
+  c.fillStyle='#0b1f2a';c.fillRect(0,0,w,h);
+  const left=74,right=15,top=20,bottom=26,plotW=w-left-right,plotH=h-top-bottom;
+  const key=channel.key.toLowerCase(),info=record.channels[key];
+  c.fillStyle='#cce4e7';c.font='bold 14px system-ui';c.fillText(`${channel.label} · ${channel.unit}`,12,15);
+  c.strokeStyle='#28505a';c.fillStyle='#91aeb6';c.font='11px system-ui';
+  for(let tick=0;tick<=4;tick++){
+    const y=top+tick*plotH/4;
+    c.beginPath();c.moveTo(left,y);c.lineTo(w-right,y);c.stroke();
+    c.fillText((range[1]-(range[1]-range[0])*tick/4).toFixed(0),10,y+4);
+  }
+  if(!info){c.fillText('No source channel',left+12,top+plotH/2);return;}
+  const end=recordClock(record,elapsed),start=end-Math.round(seconds*record.fs);
+  let previous=null,plotted=0;
+  c.strokeStyle=channel.color;c.lineWidth=1.5;c.beginPath();
+  for(let x=0;x<Math.floor(plotW);x++){
+    const from=start+Math.floor(x*(end-start)/plotW);
+    const to=start+Math.max(1,Math.floor((x+1)*(end-start)/plotW));
+    let lo=Infinity,hi=-Infinity;
+    for(let clock=from;clock<to;clock++){
+      const sample=((clock%record.samples)+record.samples)%record.samples;
+      const digital=decodeWindowSample(sample,info.index,record.count,record.parts);
+      if(digital===null)continue;
+      const value=(digital-info.baseline)/info.gain;
+      lo=Math.min(lo,value);hi=Math.max(hi,value);
+    }
+    if(!Number.isFinite(lo)){previous=null;continue;}
+    const scale=value=>top+plotH-THREE.MathUtils.clamp((value-range[0])/(range[1]-range[0]||1),0,1)*plotH;
+    const middle=scale((lo+hi)/2);
+    if(previous===null)c.moveTo(left+x,middle);else c.lineTo(left+x,middle);
+    previous=middle;plotted++;
+    if(hi!==lo){c.moveTo(left+x,scale(hi));c.lineTo(left+x,scale(lo));c.moveTo(left+x,middle);}
+  }
+  c.stroke();
+  if(!plotted){c.fillStyle='#91aeb6';c.fillText('Loading source samples…',left+12,top+plotH/2);}
+  c.fillStyle='#91aeb6';c.font='11px system-ui';
+  for(let tick=0;tick<=4;tick++){
+    const x=left+tick*plotW/4;
+    c.fillText(`${Math.round(seconds*(tick/4-1))} s`,x-10,h-7);
+  }
+}
+
+async function paintTelemetryDetail(now) {
+  if(!telemetryDetail || telemetryDetail.source!=='vital' || !telemetryDetail.assignment.telemetry_record || now-lastDetailPaint<33)return;
+  lastDetailPaint=now;
+  const detail=telemetryDetail;
+  const sceneElapsed=exportElapsedSeconds??(now-playbackStart)/1000;
+  const elapsed=detail.paused?detail.elapsed:sceneElapsed-detail.offset;
+  try{
+    const record=await getRecord(detail.assignment.telemetry_record);
+    if(telemetryDetail!==detail)return;
+    const seconds=Number(document.querySelector('#vitalWindow').value);
+    await fillRecordCache(record,elapsed,seconds);
+    if(telemetryDetail!==detail || !isCached(record,elapsed,0,seconds))return;
+    detail.ranges ||= vitalDetailRanges(record,elapsed,seconds);
+    const sourceTime=((recordClock(record,elapsed)%record.samples)+record.samples)%record.samples/record.fs;
+    document.querySelector('#vitalProgress').textContent=`Full ${record.fs} Hz source · ${Math.floor(sourceTime/60)}:${String(Math.floor(sourceTime%60)).padStart(2,'0')} / ${Math.floor(record.duration/60)}:${String(Math.floor(record.duration%60)).padStart(2,'0')}`;
+    channels.forEach((channel,index)=>drawVitalChart(document.querySelector(`#vitalChart${index}`),record,channel,detail.ranges[index],elapsed,seconds));
+  }catch(error){if(telemetryDetail===detail)document.querySelector('#vitalProgress').textContent=`Vital waveform unavailable: ${error.message}`;}
 }
 
 // Source: scene3d/parts/navigation.js
@@ -1360,29 +1501,15 @@ function roomAssignment(hospitalId, floor, room) {
 }
 
 function updateOpenFeedButton() {
-  const button=document.querySelector('#openFeed');
   const room=walkMode?walkRoom:activeRoom;
   const assignment=room?roomAssignment(activeHospital,activeFloor,room):null;
-  button.hidden=!(assignment?.patient_id && (assignment.uc_davis_recording || assignment.telemetry_record));
-  button.disabled=button.hidden;
-  button.textContent=assignment?.uc_davis_recording?'Open full UC Davis waveform':
-    assignment?.telemetry_record?'Open full MGH telemetry':'Open full waveform';
-}
-
-async function paintTelemetryDetail(now) {
-  if (!telemetryDetail || now-lastDetailPaint<80) return;
-  lastDetailPaint=now;
-  const {assignment,canvas}=telemetryDetail;
-  const elapsed=exportElapsedSeconds ?? (now-playbackStart)/1000;
-  try {
-    const record=await getRecord(assignment.telemetry_record);
-    if (!telemetryDetail || telemetryDetail.assignment!==assignment) return;
-    await fillRecordCache(record,elapsed);
-    if (!telemetryDetail || telemetryDetail.assignment!==assignment || !isCached(record,elapsed)) return;
-    const start=recordClock(record,elapsed)-record.windows.length;
-    for(let j=0;j<record.windows.length;j++)record.windows[j]=((start+j)%record.samples+record.samples)%record.samples;
-    drawMonitor(canvas,assignment.room,record,elapsed);
-  } catch(error) { showError(String(error)); }
+  const visible=Boolean(assignment?.patient_id);
+  for(const [id,source,label] of [['openVital','telemetry_record','vital'],['openVent','uc_davis_recording','ventilator']]){
+    const button=document.querySelector(`#${id}`);
+    button.hidden=!visible;
+    button.disabled=!visible;
+    button.title=visible&&!assignment?.[source]?`No ${label} waveform source for this patient`:'';
+  }
 }
 
 function activateHospital(hospitalId) {
@@ -1724,21 +1851,29 @@ async function changePatient(step){
 }
 document.querySelector('#previousPatient').addEventListener('click', () => changePatient(-1));
 document.querySelector('#nextPatient').addEventListener('click', () => changePatient(1));
-document.querySelector('#openFeed').addEventListener('click',()=>{
+document.querySelector('#openVital').addEventListener('click',()=>{
   const room=walkMode?walkRoom:activeRoom;
   const assignment=room?roomAssignment(activeHospital,activeFloor,room):null;
-  if(assignment?.telemetry_record){
-    const panel=document.querySelector('#telemetryDetail');
-    telemetryDetail={assignment,canvas:document.querySelector('#telemetryCanvas')};
-    document.querySelector('#telemetryTitle').textContent=`${assignment.id} · ${assignment.telemetry_record.toUpperCase()} · PhysioNet telemetry`;
-    panel.classList.add('open');
-    paintTelemetryDetail(performance.now());
-    return;
-  }
-  if(!assignment?.uc_davis_recording)return;
+  if(assignment?.telemetry_record)openVitalDetail(assignment);
+});
+document.querySelector('#openVent').addEventListener('click',()=>{
+  const room=walkMode?walkRoom:activeRoom;
+  const assignment=room?roomAssignment(activeHospital,activeFloor,room):null;
+  if(!assignment?.uc_davis_recording){if(assignment?.patient_id)openVitalDetail(assignment,'vent');return;}
   parent.postMessage({type:'zebezo-open-recording',recording:assignment.uc_davis_recording,
     roomId:assignment.id},location.origin);
 });
+document.querySelector('#vitalTab').addEventListener('click',()=>selectVitalDetailTab('vital'));
+document.querySelector('#ventTab').addEventListener('click',()=>selectVitalDetailTab('vent'));
+document.querySelector('#vitalPlay').addEventListener('click',()=>{
+  if(!telemetryDetail)return;
+  const sceneElapsed=exportElapsedSeconds??(performance.now()-playbackStart)/1000;
+  if(telemetryDetail.paused)telemetryDetail.offset=sceneElapsed-telemetryDetail.elapsed;
+  else telemetryDetail.elapsed=sceneElapsed-telemetryDetail.offset;
+  telemetryDetail.paused=!telemetryDetail.paused;
+  document.querySelector('#vitalPlay').textContent=telemetryDetail.paused?'Resume':'Pause';
+});
+document.querySelector('#vitalWindow').addEventListener('change',()=>{lastDetailPaint=0;if(telemetryDetail)telemetryDetail.ranges=null;});
 document.querySelector('#closeTelemetry').addEventListener('click',()=>{
   telemetryDetail=null;
   document.querySelector('#telemetryDetail').classList.remove('open');
@@ -1761,6 +1896,10 @@ document.addEventListener('mousemove', event => {
 });
 document.addEventListener('keydown', event => {
   const key = event.key.toLowerCase();
+  if(telemetryDetail){
+    if(key==='escape'){document.querySelector('#closeTelemetry').click();event.preventDefault();}
+    return;
+  }
   if (walkMode && ['w', 'a', 's', 'd', 'shift'].includes(key)) { movementKeys.add(key); event.preventDefault(); }
   if (walkMode && key === 'e' && !event.repeat) { toggleElevatorDoor(); event.preventDefault(); }
   if (walkMode && key === 'i' && !event.repeat) { document.querySelector('#inspectTarget').click(); event.preventDefault(); }
@@ -1958,7 +2097,7 @@ function animate() {
     if (t === 1) cameraMove = null;
   }
   if (!tourPlaying && !walkMode) controls.update();
-  if (now - lastFeedPaint >= 50 && floors.length) {
+  if (now - lastFeedPaint >= 33 && floors.length) {
     camera.updateMatrixWorld();
     const projection = new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     const frustum = new THREE.Frustum().setFromProjectionMatrix(projection);
@@ -2152,7 +2291,7 @@ async function boot() {
   [meta, campusManifest, catalogConfig] = await Promise.all([
     fetch('./scene_meta.json').then(r => r.json()),
     fetch('./campus_manifest_full_catalog.json').then(r=>r.json()),
-    fetch('./catalog_config.json?v=20261030-stable-sweep1').then(r=>r.json()),
+    fetch('./catalog_config.json?v=20261030-full-waveforms1').then(r=>r.json()),
   ]);
   telemetryBase = new URL(catalogConfig.mgh_base,location.href).href;
   modelBase = new URL(catalogConfig.model_base || './',location.href).href;

@@ -28,32 +28,107 @@ function previewRanges(entry) {
   };
 }
 
+function fullSceneRanges(data) {
+  if (data.sceneRanges) return data.sceneRanges;
+  const padded = (values, pad) => {
+    let low = Infinity, high = -Infinity;
+    for (const value of values) if (Number.isFinite(value)) {
+      low = Math.min(low, value); high = Math.max(high, value);
+    }
+    const margin = Math.max(pad, (high - low) * .08);
+    return Number.isFinite(low) ? [low - margin, high + margin] : [0, 1];
+  };
+  return data.sceneRanges = {
+    pressure: padded(data.pressure, 2), flow: padded(data.flow, 5), volume: padded(data.volume, 15),
+  };
+}
+
+function sceneWindow(entry, end) {
+  const data = state.cache.get(entry.name);
+  const last = Math.max(0, Math.min(entry.samples - 1, Math.floor(end * RATE)));
+  if (data?.loadedSegments.has(segmentNumber(entry, last)) && Number.isFinite(data.flow[last])) {
+    const flow = [], pressure = [], volume = [];
+    for (let offset = 249; offset >= 0; offset--) {
+      const index = last - offset;
+      for (const [target, source] of [[flow, data.flow], [pressure, data.pressure], [volume, data.volume]]) {
+        const value = index >= 0 ? source[index] : NaN;
+        target.push(Number.isFinite(value) ? value : null);
+      }
+    }
+    return { sourceRate: 50, flow, pressure, volume, ranges: fullSceneRanges(data) };
+  }
+  if (!entry.previewBytes) return null;
+  const ranges = previewRanges(entry), flow = [], pressure = [], volume = [];
+  const duration = entry.samples / RATE;
+  for (let index = 0; index < 50; index++) {
+    const sampleTime = Math.max(0, end - 5 + index / 10);
+    const sample = signalAt(entry, sampleTime);
+    flow.push(sample?.flow ?? null); pressure.push(sample?.pressure ?? null);
+    const bin = Math.min(entry.signalBins - 1, Math.floor(sampleTime * 10));
+    const value = sampleTime < duration ? entry.previewVolume[bin] : NaN;
+    volume.push(Number.isFinite(value) ? value : null);
+  }
+  return { sourceRate: 10, flow, pressure, volume, ranges };
+}
+
+const sceneWarmInFlight = new Map();
+const scenePreviewRequests = new Map();
+async function warmSceneFloor(hospital, floor) {
+  const key=`${hospital}:${floor}`;
+  if(sceneWarmInFlight.has(key))return sceneWarmInFlight.get(key);
+  const entries = state.entries.filter(entry => {
+    const room = fullCatalogByRecording.get(entry.name);
+    return room?.hospital_id === hospital && room.floor === floor;
+  });
+  let next = 0;
+  async function worker() {
+    while (next < entries.length) {
+      const entry = entries[next++];
+      try {
+        await state.segmentStore.ready(entry.name);
+        await ensureAt(entry, feedData(entry), Math.min(entry.samples - 1, Math.floor(feedClock(entry) * RATE)));
+      } catch (error) { console.warn(`Scene waveform unavailable for ${entry.name}:`, error); }
+    }
+  }
+  const promise=Promise.all([worker(), worker()]).finally(()=>sceneWarmInFlight.delete(key));
+  sceneWarmInFlight.set(key,promise);
+  return promise;
+}
+
+function requestSceneFloor(hospital,floor,quality='preview') {
+  const key=`${hospital}:${floor}`,now=performance.now();
+  const previous=scenePreviewRequests.get(key);
+  scenePreviewRequests.set(key,{hospital,floor,now,lastWarm:previous?.lastWarm||0});
+  if(!previous)loadPreviewForFloor(hospital,floor).catch(()=>{});
+  if(quality==='full' && (!previous?.lastWarm || now-previous.lastWarm>4000)){
+    scenePreviewRequests.get(key).lastWarm=now;
+    if(state.segmentStore)warmSceneFloor(hospital,floor).catch(()=>{});
+  }
+}
+
 function frame(now) {
-  if(state.signals&&!document.hidden&&now-(state.lastSceneSignalTime||0)>50){
+  if(state.entries.length&&!document.hidden&&now-(state.lastSceneSignalTime||0)>33){
     const scene=els.hospitalScene?.contentWindow;
     const ward=scene?.wardViewer;
     if(ward && !ward.hospitalView && !ward.expandedHospital){
       const rooms=[];
+      const floors=[{hospital:ward.activeHospital,floor:ward.activeFloor},
+        ...[...scenePreviewRequests.values()].filter(item=>item.hospital===ward.activeHospital&&now-item.now<3000)];
+      const seen=new Set();
+      for(const item of floors){
+        const floorKey=`${item.hospital}:${item.floor}`;
+        if(seen.has(floorKey))continue;
+        seen.add(floorKey);
       for(let room=1;room<=6;room++){
-        const assignment=ward.roomAssignment(ward.activeHospital,ward.activeFloor,room);
+        const assignment=ward.roomAssignment(item.hospital,item.floor,room);
         if(!assignment?.uc_davis_recording)continue;
         const entry=state.entries.find(item=>item.name===assignment.uc_davis_recording);
-        if(!entry?.previewBytes)continue;
+        if(!entry)continue;
         const duration=entry.samples/RATE;
-        const end=feedClock(entry)%duration;
-        const ranges=previewRanges(entry);
-        const flow=[],pressure=[],volume=[];
-        for(let index=0;index<50;index++){
-          const sampleTime=((end-5+index/10)%duration+duration)%duration;
-          const sample=signalAt(entry,sampleTime);
-          flow.push(sample?.flow??null);pressure.push(sample?.pressure??null);
-          const bin=Math.min(entry.signalBins-1,Math.floor(sampleTime*10));
-          const volumeValue=entry.previewVolume[bin];
-          volume.push(Number.isFinite(volumeValue)?volumeValue:null);
-        }
-        rooms.push({id:assignment.id,recording:entry.name,sourceSeconds:end,flow,pressure,
-          volume,
-          ranges});
+        const end=Math.min(feedClock(entry),duration);
+        const window=sceneWindow(entry,end);
+        if(window)rooms.push({id:assignment.id,recording:entry.name,sourceSeconds:end,...window});
+      }
       }
       if(rooms.length)scene.postMessage({type:'zebezo-ward-windows',rooms},location.origin);
     }

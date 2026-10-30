@@ -82,7 +82,7 @@ function animate() {
     if (t === 1) cameraMove = null;
   }
   if (!tourPlaying && !walkMode) controls.update();
-  if (now - lastFeedPaint >= 50 && floors.length) {
+  if (now - lastFeedPaint >= 33 && floors.length) {
     camera.updateMatrixWorld();
     const projection = new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     const frustum = new THREE.Frustum().setFromProjectionMatrix(projection);

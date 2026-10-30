@@ -27,6 +27,9 @@ async function selectEntry(entry) {
   state.active=false;state.lastFrame=0;state.position=handoffSeconds*RATE;state.selected=entry;state.data=null;
   state.selectedNode=state.nodes.find(n=>n.kind==='room'&&n.entry===entry);focusUnit(entry.unit);
   els.database.hidden=true;els.waveform.hidden=false;
+  $('patientNoVital').hidden=true;
+  $('patientVitalTab').classList.remove('selected');$('patientVitalTab').setAttribute('aria-pressed','false');
+  $('patientVentTab').classList.add('selected');$('patientVentTab').setAttribute('aria-pressed','true');
   updateSpeaker();
   renderRoomHeader(entry);
   renderBreadcrumbs(entry.unit,entry.room);

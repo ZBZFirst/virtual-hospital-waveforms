@@ -29,6 +29,8 @@ function openDetail(){
   resetDetailMotion();
   $('viewOnCube').hidden=!(state.unitPlayback&&els.streamTitle.textContent.endsWith('six patient beds'));
   const roomOpen=!els.waveform.hidden;
+  $('patientWaveformTabs').hidden=!(roomOpen && state.selected && fullCatalogByRecording.has(state.selected.name));
+  if(!roomOpen)$('patientNoVital').hidden=true;
   els.streamTitle.classList.toggle('room-title',roomOpen);
   els.streamMeta.classList.toggle('patient-id',roomOpen);
   $('recordingInfo').hidden=!roomOpen;

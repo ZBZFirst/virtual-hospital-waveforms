@@ -123,6 +123,7 @@ function setCubeHover(face,event) {
 function setGrandCubeFocused(focused) {
   if(!grandCube)return;
   grandCube.focused=focused;
+  if(focused)grandCube.faces.forEach(face=>{face.lastSourceRequest=0;});
   grandCube.targetScale=focused?1:0.25;
   if(!focused)setCubeHover(null);
 }
@@ -292,8 +293,13 @@ function drawCubeFaces(elapsed, now, frustum) {
     const normal=new THREE.Vector3(0,0,1).applyQuaternion(face.mesh.getWorldQuaternion(new THREE.Quaternion()));
     if(normal.dot(camera.position.clone().sub(center))<=0.02)continue;
     if(!frustum.intersectsBox(new THREE.Box3().setFromObject(face.mesh)))continue;
+    if(embedded && (!face.lastSourceRequest || now-face.lastSourceRequest>2000)){
+      parent.postMessage({type:'zebezo-cube-face',hospital:activeHospital,floor:face.floor,
+        quality:grandCube.focused?'full':'preview'},location.origin);
+      face.lastSourceRequest=now;
+    }
     if((!telemetryReady[face.floor-1] || floorRecords[face.floor-1]?.some(r=>r&&!isCached(r,elapsed))) &&
       campusManifest.rooms.some(room=>room.hospital_id===activeHospital&&room.floor===face.floor&&room.telemetry_record))ensureTelemetryCaches(face.floor);
-    if(now-face.lastDrawTime>=80)drawCubeFace(face,elapsed,now);
+    if(now-face.lastDrawTime>=(grandCube.focused?33:80))drawCubeFace(face,elapsed,now);
   }
 }
