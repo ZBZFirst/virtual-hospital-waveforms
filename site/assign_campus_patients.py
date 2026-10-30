@@ -29,6 +29,8 @@ slots = [room_by_id[f'{hospital}-F{floor:02d}-R{bed:02d}']
 uc_index = mgh_index = 0
 next_source = 'uc_davis'
 for room in slots:
+    for key in ('simulation_room', 'simulated_uc_davis_recording', 'simulated_telemetry_record'):
+        room.pop(key, None)
     source = next_source if uc_index < len(uc_sources) and mgh_index < len(mgh_sources) else (
         'uc_davis' if uc_index < len(uc_sources) else
         'physionet_mgh' if mgh_index < len(mgh_sources) else None)
@@ -48,10 +50,24 @@ for room in slots:
         next_source = 'uc_davis'
 
 assert (uc_index, mgh_index) == (145, 24)
-campus['version'] = 3
+for hospital in hospitals:
+    for floor in range(1, 7):
+        donor = room_by_id[f'{hospital}-F{floor:02d}-R05']
+        simulation = room_by_id[f'{hospital}-F{floor:02d}-R06']
+        if not simulation['patient_id']:
+            continue
+        simulation['simulation_room'] = True
+        if not simulation['uc_davis_recording'] and donor['uc_davis_recording']:
+            simulation['simulated_uc_davis_recording'] = donor['uc_davis_recording']
+        if not simulation['telemetry_record'] and donor['telemetry_record']:
+            simulation['simulated_telemetry_record'] = donor['telemetry_record']
+
+campus['version'] = 4
 campus['note'] = ('Illustrative campus beds rotate across hospitals A-E and alternate independent '
                   'UC Davis and MGH recordings until MGH is exhausted; remaining beds use UC Davis. '
-                  'Recording IDs are not verified patient identities and the two sources are never paired.')
+                  'Occupied Room 6 beds are marked Simulation Room. Where Room 5 has the missing type, '
+                  'Room 6 displays that source as a simulation; the two recordings are not from one patient. '
+                  'Recording IDs are not verified patient identities.')
 path.write_text(json.dumps(campus, indent=2) + '\n')
 print(f'Assigned {uc_index} UC Davis and {mgh_index} MGH recordings across {len(hospitals)} hospitals; '
       f'{len(slots)-uc_index-mgh_index} beds empty')

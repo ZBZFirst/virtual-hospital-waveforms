@@ -188,6 +188,27 @@ function styleHospitalShell(shell, hospitalName = 'HOSPITAL') {
   label.name='Hospital roof label';label.rotation.x=-Math.PI/2;label.position.set(0,19.32,0);shell.add(label);
 }
 
+function prepareSimulationRooms(campus) {
+  const byId=new Map(campus.rooms.map(room=>[room.id,room]));
+  for(const room of campus.rooms){
+    if(!room.simulation_room)continue;
+    if(room.room!==6 || !room.patient_id)throw Error(`${room.id}: invalid simulation room`);
+    const donor=byId.get(`${room.hospital_id}-F${String(room.floor).padStart(2,'0')}-R05`);
+    if(!donor)throw Error(`${room.id}: Room 5 source missing`);
+    if(room.simulated_uc_davis_recording){
+      if(room.uc_davis_recording || room.simulated_uc_davis_recording!==donor.uc_davis_recording)
+        throw Error(`${room.id}: invalid simulated ventilator source`);
+      room.uc_davis_recording=room.simulated_uc_davis_recording;
+    }
+    if(room.simulated_telemetry_record){
+      if(room.telemetry_record || room.simulated_telemetry_record!==donor.telemetry_record)
+        throw Error(`${room.id}: invalid simulated telemetry source`);
+      room.telemetry_record=room.simulated_telemetry_record;
+    }
+  }
+  return byId;
+}
+
 function roomAssignment(hospitalId, floor, room) {
   return roomById.get(`${hospitalId}-F${String(floor).padStart(2,'0')}-R${String(room).padStart(2,'0')}`) || null;
 }

@@ -55,8 +55,8 @@ function setupEvents() {
     if(event.data?.type==='zebezo-cube-face')requestSceneFloor(event.data.hospital,event.data.floor,event.data.quality);
     if(event.data?.type==='zebezo-open-recording'){
       const entry=state.entries.find(item=>item.name===event.data.recording);
-      if(entry)selectEntry(entry);
-      else state.pendingSceneRecording=event.data.recording;
+      if(entry)selectEntry(entry,simulationRoomForRecording(event.data.roomId,entry.name));
+      else state.pendingSceneRecording={recording:event.data.recording,roomId:event.data.roomId};
     }
   });
   els.hospitalScene.addEventListener('load',()=>els.hospitalScene.contentWindow?.postMessage({type:'zebezo-scene-action',action:'status'},location.origin));

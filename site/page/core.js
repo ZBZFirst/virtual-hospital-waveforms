@@ -3,6 +3,7 @@ const RATE = 50;
 const DEFAULT_WINDOW_SECONDS = 30;
 let breathSequenceMap=null;
 let fullCatalogByRecording=new Map();
+let fullCatalogById=new Map();
 const LAYOUT_KEY = 'zebezo-hospital-layout-v3';
 const LEGACY_LAYOUT_KEYS = ['zebezo-hospital-layout-v2','zebezo-hospital-layout-v1'];
 const ATLAS_SIGNAL_STRIDE = 5;

@@ -74,7 +74,7 @@ function breadcrumbButton(label,action){
 }
 function renderBreadcrumbs(unit,room){
   els.breadcrumbs.replaceChildren();
-  const virtualRoom=state.selected&&fullCatalogByRecording.get(state.selected.name);
+  const virtualRoom=state.selected&&(state.sceneRoomContext||fullCatalogByRecording.get(state.selected.name));
   if(virtualRoom){
     els.breadcrumbs.append(breadcrumbButton('Virtual campus',()=>{
       closeDetails();els.hospitalScene.contentWindow?.postMessage({type:'zebezo-scene-action',action:'reset'},location.origin);

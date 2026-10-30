@@ -1,4 +1,22 @@
 let sharedPatientAssets = null;
+let simulationSignTexture = null;
+function makeSimulationRoomSign() {
+  if(!simulationSignTexture){
+    const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=256;
+    const c=canvas.getContext('2d');
+    c.fillStyle='#f4eee1';c.fillRect(0,0,1024,256);
+    c.strokeStyle='#173d49';c.lineWidth=16;c.strokeRect(8,8,1008,240);
+    c.fillStyle='#173d49';c.font='bold 94px system-ui, sans-serif';
+    c.textAlign='center';c.textBaseline='middle';c.fillText('Simulation Room',512,132);
+    simulationSignTexture=new THREE.CanvasTexture(canvas);
+    simulationSignTexture.colorSpace=THREE.SRGBColorSpace;
+  }
+  const sign=new THREE.Mesh(new THREE.PlaneGeometry(1.08,.27),
+    new THREE.MeshBasicMaterial({map:simulationSignTexture,side:THREE.DoubleSide}));
+  sign.name='Simulation Room door sign';
+  sign.position.set(.62,1.12,-.065);
+  return sign;
+}
 function configureRoomEquipment(bedRig, overlay, assignment, room) {
   const hasVentilator = Boolean(assignment.uc_davis_recording);
   const hasTelemetry = Boolean(assignment.telemetry_record);
@@ -85,6 +103,7 @@ async function ensureFloor(hospitalId, level) {
       roomDoors.push({hinge,open,closed});
       const assignment=roomAssignment(hospitalId,level,room);
       if(!assignment)throw Error(`Hospital ${hospitalId} floor ${level} room ${room}: missing room assignment slot`);
+      if(room===6 && assignment.simulation_room)hinge.add(makeSimulationRoomSign());
       const occupancyName=level===1?`Room_${pad}_OCCUPANCY_display`:`F${String(level).padStart(2,'0')}_|_Room_${pad}_OCCUPANCY_display`;
       const target=group.getObjectByName(occupancyName);
       if(!target)throw Error(`Hospital ${hospitalId} floor ${level} room ${room}: occupancy group missing`);

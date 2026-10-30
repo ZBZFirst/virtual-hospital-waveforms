@@ -6,6 +6,7 @@ const RATE = 50;
 const DEFAULT_WINDOW_SECONDS = 30;
 let breathSequenceMap=null;
 let fullCatalogByRecording=new Map();
+let fullCatalogById=new Map();
 const LAYOUT_KEY = 'zebezo-hospital-layout-v3';
 const LEGACY_LAYOUT_KEYS = ['zebezo-hospital-layout-v2','zebezo-hospital-layout-v1'];
 const ATLAS_SIGNAL_STRIDE = 5;
@@ -562,7 +563,7 @@ function breadcrumbButton(label,action){
 }
 function renderBreadcrumbs(unit,room){
   els.breadcrumbs.replaceChildren();
-  const virtualRoom=state.selected&&fullCatalogByRecording.get(state.selected.name);
+  const virtualRoom=state.selected&&(state.sceneRoomContext||fullCatalogByRecording.get(state.selected.name));
   if(virtualRoom){
     els.breadcrumbs.append(breadcrumbButton('Virtual campus',()=>{
       closeDetails();els.hospitalScene.contentWindow?.postMessage({type:'zebezo-scene-action',action:'reset'},location.origin);
@@ -1184,7 +1185,11 @@ function openVirtualRoom(hospitalId,level,room){
   if(entry)selectEntry(entry);
   else showHospital(hospitalId,level,room);
 }
-async function selectEntry(entry) {
+function simulationRoomForRecording(roomId,recording) {
+  const room=fullCatalogById.get(roomId);
+  return room?.simulation_room && room.simulated_uc_davis_recording===recording?room:null;
+}
+async function selectEntry(entry,roomContext=null) {
   stopPatientAudio();
   loadPreviewForEntry(entry).catch(()=>{});
   if(state.selected?.name!==entry.name)
@@ -1202,6 +1207,7 @@ async function selectEntry(entry) {
   els.speed.value='1';
   if(state.pending)state.pending.abort();
   state.active=false;state.lastFrame=0;state.position=handoffSeconds*RATE;state.selected=entry;state.data=null;
+  state.sceneRoomContext=roomContext;
   state.selectedNode=state.nodes.find(n=>n.kind==='room'&&n.entry===entry);focusUnit(entry.unit);
   els.database.hidden=true;els.waveform.hidden=false;
   $('patientNoVital').hidden=true;
@@ -1232,10 +1238,12 @@ async function selectEntry(entry) {
 }
 function renderRoomHeader(entry){
   els.streamLabel.textContent=`STREAM ${String(entry.number).padStart(3,'0')}`;
-  const virtualRoom=fullCatalogByRecording.get(entry.name);
+  const virtualRoom=state.sceneRoomContext||fullCatalogByRecording.get(entry.name);
   els.streamTitle.textContent=virtualRoom?`Hospital ${virtualRoom.hospital_id} · Floor ${virtualRoom.floor} · Room ${String(virtualRoom.room).padStart(2,'0')}`:
     entry.unit===null?'Unassigned feed':`Unit ${String(entry.unit).padStart(2,'0')} · Room ${String(entry.room).padStart(2,'0')}`;
-  els.streamMeta.textContent=`Source recording ID: ${entry.name.split('-')[0]} · illustrative room assignment`;
+  els.streamMeta.textContent=state.sceneRoomContext?
+    `Source recording ID: ${entry.name.split('-')[0]} · Simulation Room · ventilator source duplicated from Room 5`:
+    `Source recording ID: ${entry.name.split('-')[0]} · illustrative room assignment`;
   $('recordingFilename').textContent=entry.name;
   $('recordingRpi').textContent=String(entry.rpi);
   $('recordingStart').textContent=entry.shiftedStart;
@@ -1699,8 +1707,8 @@ function setupEvents() {
     if(event.data?.type==='zebezo-cube-face')requestSceneFloor(event.data.hospital,event.data.floor,event.data.quality);
     if(event.data?.type==='zebezo-open-recording'){
       const entry=state.entries.find(item=>item.name===event.data.recording);
-      if(entry)selectEntry(entry);
-      else state.pendingSceneRecording=event.data.recording;
+      if(entry)selectEntry(entry,simulationRoomForRecording(event.data.roomId,entry.name));
+      else state.pendingSceneRecording={recording:event.data.recording,roomId:event.data.roomId};
     }
   });
   els.hospitalScene.addEventListener('load',()=>els.hospitalScene.contentWindow?.postMessage({type:'zebezo-scene-action',action:'status'},location.origin));
@@ -1891,9 +1899,10 @@ async function init() {
   try {
     const [manifest,campus]=await Promise.all([
       fetch('manifest.json').then(response=>{if(!response.ok)throw Error(`Manifest HTTP ${response.status}`);return response.json();}),
-      fetch('scene3d/campus_manifest_full_catalog.json').then(response=>{if(!response.ok)throw Error(`Campus HTTP ${response.status}`);return response.json();})
+      fetch('scene3d/campus_manifest_full_catalog.json?v=20261030-simulation-rooms1').then(response=>{if(!response.ok)throw Error(`Campus HTTP ${response.status}`);return response.json();})
     ]);
     state.entries=manifest.entries;
+    fullCatalogById=new Map(campus.rooms.map(room=>[room.id,room]));
     fullCatalogByRecording=new Map(campus.rooms.filter(room=>room.uc_davis_recording).map(room=>[room.uc_davis_recording,room]));
     if(fullCatalogByRecording.size!==state.entries.length || state.entries.some(entry=>!fullCatalogByRecording.has(entry.name)))
       throw new Error('Full campus registry does not cover every UC Davis recording');
@@ -1940,9 +1949,10 @@ async function init() {
     renderSegmentProgress(state.segmentStore.stats());
     if(state.lastSceneLocation)syncSceneLocation(state.lastSceneLocation);
     if(state.pendingSceneRecording){
-      const entry=state.entries.find(item=>item.name===state.pendingSceneRecording);
+      const pending=state.pendingSceneRecording;
+      const entry=state.entries.find(item=>item.name===pending.recording);
       state.pendingSceneRecording=null;
-      if(entry)selectEntry(entry);
+      if(entry)selectEntry(entry,simulationRoomForRecording(pending.roomId,entry.name));
     }
     openRoute();window.addEventListener('hashchange',openRoute);
   } catch(err) {els.datasetStats.textContent=`Could not load manifest: ${err.message}. Open through the local HTTP server.`;}

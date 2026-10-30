@@ -26,9 +26,10 @@ async function init() {
   try {
     const [manifest,campus]=await Promise.all([
       fetch('manifest.json').then(response=>{if(!response.ok)throw Error(`Manifest HTTP ${response.status}`);return response.json();}),
-      fetch('scene3d/campus_manifest_full_catalog.json').then(response=>{if(!response.ok)throw Error(`Campus HTTP ${response.status}`);return response.json();})
+      fetch('scene3d/campus_manifest_full_catalog.json?v=20261030-simulation-rooms1').then(response=>{if(!response.ok)throw Error(`Campus HTTP ${response.status}`);return response.json();})
     ]);
     state.entries=manifest.entries;
+    fullCatalogById=new Map(campus.rooms.map(room=>[room.id,room]));
     fullCatalogByRecording=new Map(campus.rooms.filter(room=>room.uc_davis_recording).map(room=>[room.uc_davis_recording,room]));
     if(fullCatalogByRecording.size!==state.entries.length || state.entries.some(entry=>!fullCatalogByRecording.has(entry.name)))
       throw new Error('Full campus registry does not cover every UC Davis recording');
@@ -75,9 +76,10 @@ async function init() {
     renderSegmentProgress(state.segmentStore.stats());
     if(state.lastSceneLocation)syncSceneLocation(state.lastSceneLocation);
     if(state.pendingSceneRecording){
-      const entry=state.entries.find(item=>item.name===state.pendingSceneRecording);
+      const pending=state.pendingSceneRecording;
+      const entry=state.entries.find(item=>item.name===pending.recording);
       state.pendingSceneRecording=null;
-      if(entry)selectEntry(entry);
+      if(entry)selectEntry(entry,simulationRoomForRecording(pending.roomId,entry.name));
     }
     openRoute();window.addEventListener('hashchange',openRoute);
   } catch(err) {els.datasetStats.textContent=`Could not load manifest: ${err.message}. Open through the local HTTP server.`;}

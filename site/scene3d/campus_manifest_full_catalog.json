@@ -1,6 +1,6 @@
 {
-  "version": 3,
-  "note": "Illustrative campus beds rotate across hospitals A-E and alternate independent UC Davis and MGH recordings until MGH is exhausted; remaining beds use UC Davis. Recording IDs are not verified patient identities and the two sources are never paired.",
+  "version": 4,
+  "note": "Illustrative campus beds rotate across hospitals A-E and alternate independent UC Davis and MGH recordings until MGH is exhausted; remaining beds use UC Davis. Occupied Room 6 beds are marked Simulation Room. Where Room 5 has the missing type, Room 6 displays that source as a simulation; the two recordings are not from one patient. Recording IDs are not verified patient identities.",
   "source_catalogs": {
     "uc_davis": {
       "count": 145,
@@ -131,7 +131,9 @@
       "telemetry_record": "mgh015",
       "ventilator_excerpt_room": null,
       "legacy_unit": null,
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true,
+      "simulated_uc_davis_recording": "18e5f480de9f4095a120ab6f293439fc-rpi20-2154-11-14-16-57-53.882161.csv"
     },
     {
       "id": "A-F02-R01",
@@ -209,7 +211,8 @@
       "telemetry_record": null,
       "ventilator_excerpt_room": null,
       "legacy_unit": "unit_21",
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true
     },
     {
       "id": "A-F03-R01",
@@ -287,7 +290,8 @@
       "telemetry_record": null,
       "ventilator_excerpt_room": null,
       "legacy_unit": "unit_08",
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true
     },
     {
       "id": "A-F04-R01",
@@ -365,7 +369,8 @@
       "telemetry_record": null,
       "ventilator_excerpt_room": null,
       "legacy_unit": "unit_12",
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true
     },
     {
       "id": "A-F05-R01",
@@ -443,7 +448,8 @@
       "telemetry_record": null,
       "ventilator_excerpt_room": null,
       "legacy_unit": "unit_16",
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true
     },
     {
       "id": "A-F06-R01",
@@ -599,7 +605,9 @@
       "telemetry_record": null,
       "ventilator_excerpt_room": null,
       "legacy_unit": "unit_02",
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true,
+      "simulated_telemetry_record": "mgh011"
     },
     {
       "id": "B-F02-R01",
@@ -677,7 +685,8 @@
       "telemetry_record": null,
       "ventilator_excerpt_room": null,
       "legacy_unit": "unit_05",
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true
     },
     {
       "id": "B-F03-R01",
@@ -755,7 +764,8 @@
       "telemetry_record": null,
       "ventilator_excerpt_room": null,
       "legacy_unit": "unit_22",
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true
     },
     {
       "id": "B-F04-R01",
@@ -833,7 +843,8 @@
       "telemetry_record": null,
       "ventilator_excerpt_room": null,
       "legacy_unit": "unit_12",
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true
     },
     {
       "id": "B-F05-R01",
@@ -911,7 +922,8 @@
       "telemetry_record": null,
       "ventilator_excerpt_room": null,
       "legacy_unit": "unit_16",
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true
     },
     {
       "id": "B-F06-R01",
@@ -1067,7 +1079,9 @@
       "telemetry_record": "mgh016",
       "ventilator_excerpt_room": null,
       "legacy_unit": null,
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true,
+      "simulated_uc_davis_recording": "1ba29cf3298845e9b5a63896ad6da818-rpi41-2177-05-20-07-50-57.384854.csv"
     },
     {
       "id": "C-F02-R01",
@@ -1145,7 +1159,8 @@
       "telemetry_record": null,
       "ventilator_excerpt_room": null,
       "legacy_unit": "unit_05",
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true
     },
     {
       "id": "C-F03-R01",
@@ -1223,7 +1238,8 @@
       "telemetry_record": null,
       "ventilator_excerpt_room": null,
       "legacy_unit": "unit_22",
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true
     },
     {
       "id": "C-F04-R01",
@@ -1301,7 +1317,8 @@
       "telemetry_record": null,
       "ventilator_excerpt_room": null,
       "legacy_unit": "unit_12",
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true
     },
     {
       "id": "C-F05-R01",
@@ -1379,7 +1396,8 @@
       "telemetry_record": null,
       "ventilator_excerpt_room": null,
       "legacy_unit": "unit_16",
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true
     },
     {
       "id": "C-F06-R01",
@@ -1535,7 +1553,9 @@
       "telemetry_record": null,
       "ventilator_excerpt_room": null,
       "legacy_unit": "unit_20",
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true,
+      "simulated_telemetry_record": "mgh013"
     },
     {
       "id": "D-F02-R01",
@@ -1613,7 +1633,8 @@
       "telemetry_record": null,
       "ventilator_excerpt_room": null,
       "legacy_unit": "unit_05",
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true
     },
     {
       "id": "D-F03-R01",
@@ -1691,7 +1712,8 @@
       "telemetry_record": null,
       "ventilator_excerpt_room": null,
       "legacy_unit": "unit_09",
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true
     },
     {
       "id": "D-F04-R01",
@@ -1769,7 +1791,8 @@
       "telemetry_record": null,
       "ventilator_excerpt_room": null,
       "legacy_unit": "unit_23",
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true
     },
     {
       "id": "D-F05-R01",
@@ -1847,7 +1870,8 @@
       "telemetry_record": null,
       "ventilator_excerpt_room": null,
       "legacy_unit": "unit_16",
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true
     },
     {
       "id": "D-F06-R01",
@@ -2003,7 +2027,9 @@
       "telemetry_record": "mgh019",
       "ventilator_excerpt_room": null,
       "legacy_unit": null,
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true,
+      "simulated_uc_davis_recording": "205d00e1c6824b97876a8d4e2a259aab-rpi32-2143-12-13-05-31-20.125894.csv"
     },
     {
       "id": "E-F02-R01",
@@ -2081,7 +2107,8 @@
       "telemetry_record": null,
       "ventilator_excerpt_room": null,
       "legacy_unit": "unit_05",
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true
     },
     {
       "id": "E-F03-R01",
@@ -2159,7 +2186,8 @@
       "telemetry_record": null,
       "ventilator_excerpt_room": null,
       "legacy_unit": "unit_09",
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true
     },
     {
       "id": "E-F04-R01",
@@ -2237,7 +2265,8 @@
       "telemetry_record": null,
       "ventilator_excerpt_room": null,
       "legacy_unit": "unit_23",
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true
     },
     {
       "id": "E-F05-R01",
@@ -2315,7 +2344,8 @@
       "telemetry_record": null,
       "ventilator_excerpt_room": null,
       "legacy_unit": "unit_16",
-      "assignment_status": "illustrative"
+      "assignment_status": "illustrative",
+      "simulation_room": true
     },
     {
       "id": "E-F06-R01",

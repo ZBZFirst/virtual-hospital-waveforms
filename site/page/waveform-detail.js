@@ -7,7 +7,11 @@ function openVirtualRoom(hospitalId,level,room){
   if(entry)selectEntry(entry);
   else showHospital(hospitalId,level,room);
 }
-async function selectEntry(entry) {
+function simulationRoomForRecording(roomId,recording) {
+  const room=fullCatalogById.get(roomId);
+  return room?.simulation_room && room.simulated_uc_davis_recording===recording?room:null;
+}
+async function selectEntry(entry,roomContext=null) {
   stopPatientAudio();
   loadPreviewForEntry(entry).catch(()=>{});
   if(state.selected?.name!==entry.name)
@@ -25,6 +29,7 @@ async function selectEntry(entry) {
   els.speed.value='1';
   if(state.pending)state.pending.abort();
   state.active=false;state.lastFrame=0;state.position=handoffSeconds*RATE;state.selected=entry;state.data=null;
+  state.sceneRoomContext=roomContext;
   state.selectedNode=state.nodes.find(n=>n.kind==='room'&&n.entry===entry);focusUnit(entry.unit);
   els.database.hidden=true;els.waveform.hidden=false;
   $('patientNoVital').hidden=true;
@@ -55,10 +60,12 @@ async function selectEntry(entry) {
 }
 function renderRoomHeader(entry){
   els.streamLabel.textContent=`STREAM ${String(entry.number).padStart(3,'0')}`;
-  const virtualRoom=fullCatalogByRecording.get(entry.name);
+  const virtualRoom=state.sceneRoomContext||fullCatalogByRecording.get(entry.name);
   els.streamTitle.textContent=virtualRoom?`Hospital ${virtualRoom.hospital_id} · Floor ${virtualRoom.floor} · Room ${String(virtualRoom.room).padStart(2,'0')}`:
     entry.unit===null?'Unassigned feed':`Unit ${String(entry.unit).padStart(2,'0')} · Room ${String(entry.room).padStart(2,'0')}`;
-  els.streamMeta.textContent=`Source recording ID: ${entry.name.split('-')[0]} · illustrative room assignment`;
+  els.streamMeta.textContent=state.sceneRoomContext?
+    `Source recording ID: ${entry.name.split('-')[0]} · Simulation Room · ventilator source duplicated from Room 5`:
+    `Source recording ID: ${entry.name.split('-')[0]} · illustrative room assignment`;
   $('recordingFilename').textContent=entry.name;
   $('recordingRpi').textContent=String(entry.rpi);
   $('recordingStart').textContent=entry.shiftedStart;

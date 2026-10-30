@@ -2,14 +2,14 @@ async function boot() {
   let catalogConfig;
   [meta, campusManifest, catalogConfig] = await Promise.all([
     fetch('./scene_meta.json').then(r => r.json()),
-    fetch('./campus_manifest_full_catalog.json').then(r=>r.json()),
-    fetch('./catalog_config.json?v=20261030-vital-review1').then(r=>r.json()),
+    fetch('./campus_manifest_full_catalog.json?v=20261030-simulation-rooms1').then(r=>r.json()),
+    fetch('./catalog_config.json?v=20261030-simulation-rooms1').then(r=>r.json()),
   ]);
   telemetryBase = new URL(catalogConfig.mgh_base,location.href).href;
   modelBase = new URL(catalogConfig.model_base || './',location.href).href;
   if(campusManifest.hospitals.length!==5 || campusManifest.rooms.length!==180 || new Set(campusManifest.rooms.map(r=>r.id)).size!==180)
     throw Error('Full catalog must define five hospitals and 180 unique room IDs');
-  roomById=new Map(campusManifest.rooms.map(room=>[room.id,room]));
+  roomById=prepareSimulationRooms(campusManifest);
   const loader = new GLTFLoader();
   modelLoader = loader;
   const bootLoad = beginModelLoad('boot','Loading 3D campus',['elevator_cab.glb',meta.hospital_shell.file]);

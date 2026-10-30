@@ -1641,6 +1641,27 @@ function styleHospitalShell(shell, hospitalName = 'HOSPITAL') {
   label.name='Hospital roof label';label.rotation.x=-Math.PI/2;label.position.set(0,19.32,0);shell.add(label);
 }
 
+function prepareSimulationRooms(campus) {
+  const byId=new Map(campus.rooms.map(room=>[room.id,room]));
+  for(const room of campus.rooms){
+    if(!room.simulation_room)continue;
+    if(room.room!==6 || !room.patient_id)throw Error(`${room.id}: invalid simulation room`);
+    const donor=byId.get(`${room.hospital_id}-F${String(room.floor).padStart(2,'0')}-R05`);
+    if(!donor)throw Error(`${room.id}: Room 5 source missing`);
+    if(room.simulated_uc_davis_recording){
+      if(room.uc_davis_recording || room.simulated_uc_davis_recording!==donor.uc_davis_recording)
+        throw Error(`${room.id}: invalid simulated ventilator source`);
+      room.uc_davis_recording=room.simulated_uc_davis_recording;
+    }
+    if(room.simulated_telemetry_record){
+      if(room.telemetry_record || room.simulated_telemetry_record!==donor.telemetry_record)
+        throw Error(`${room.id}: invalid simulated telemetry source`);
+      room.telemetry_record=room.simulated_telemetry_record;
+    }
+  }
+  return byId;
+}
+
 function roomAssignment(hospitalId, floor, room) {
   return roomById.get(`${hospitalId}-F${String(floor).padStart(2,'0')}-R${String(room).padStart(2,'0')}`) || null;
 }
@@ -2305,6 +2326,24 @@ animate();
 
 // Source: scene3d/parts/floor-loader.js
 let sharedPatientAssets = null;
+let simulationSignTexture = null;
+function makeSimulationRoomSign() {
+  if(!simulationSignTexture){
+    const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=256;
+    const c=canvas.getContext('2d');
+    c.fillStyle='#f4eee1';c.fillRect(0,0,1024,256);
+    c.strokeStyle='#173d49';c.lineWidth=16;c.strokeRect(8,8,1008,240);
+    c.fillStyle='#173d49';c.font='bold 94px system-ui, sans-serif';
+    c.textAlign='center';c.textBaseline='middle';c.fillText('Simulation Room',512,132);
+    simulationSignTexture=new THREE.CanvasTexture(canvas);
+    simulationSignTexture.colorSpace=THREE.SRGBColorSpace;
+  }
+  const sign=new THREE.Mesh(new THREE.PlaneGeometry(1.08,.27),
+    new THREE.MeshBasicMaterial({map:simulationSignTexture,side:THREE.DoubleSide}));
+  sign.name='Simulation Room door sign';
+  sign.position.set(.62,1.12,-.065);
+  return sign;
+}
 function configureRoomEquipment(bedRig, overlay, assignment, room) {
   const hasVentilator = Boolean(assignment.uc_davis_recording);
   const hasTelemetry = Boolean(assignment.telemetry_record);
@@ -2391,6 +2430,7 @@ async function ensureFloor(hospitalId, level) {
       roomDoors.push({hinge,open,closed});
       const assignment=roomAssignment(hospitalId,level,room);
       if(!assignment)throw Error(`Hospital ${hospitalId} floor ${level} room ${room}: missing room assignment slot`);
+      if(room===6 && assignment.simulation_room)hinge.add(makeSimulationRoomSign());
       const occupancyName=level===1?`Room_${pad}_OCCUPANCY_display`:`F${String(level).padStart(2,'0')}_|_Room_${pad}_OCCUPANCY_display`;
       const target=group.getObjectByName(occupancyName);
       if(!target)throw Error(`Hospital ${hospitalId} floor ${level} room ${room}: occupancy group missing`);
@@ -2469,14 +2509,14 @@ async function boot() {
   let catalogConfig;
   [meta, campusManifest, catalogConfig] = await Promise.all([
     fetch('./scene_meta.json').then(r => r.json()),
-    fetch('./campus_manifest_full_catalog.json').then(r=>r.json()),
-    fetch('./catalog_config.json?v=20261030-vital-review1').then(r=>r.json()),
+    fetch('./campus_manifest_full_catalog.json?v=20261030-simulation-rooms1').then(r=>r.json()),
+    fetch('./catalog_config.json?v=20261030-simulation-rooms1').then(r=>r.json()),
   ]);
   telemetryBase = new URL(catalogConfig.mgh_base,location.href).href;
   modelBase = new URL(catalogConfig.model_base || './',location.href).href;
   if(campusManifest.hospitals.length!==5 || campusManifest.rooms.length!==180 || new Set(campusManifest.rooms.map(r=>r.id)).size!==180)
     throw Error('Full catalog must define five hospitals and 180 unique room IDs');
-  roomById=new Map(campusManifest.rooms.map(room=>[room.id,room]));
+  roomById=prepareSimulationRooms(campusManifest);
   const loader = new GLTFLoader();
   modelLoader = loader;
   const bootLoad = beginModelLoad('boot','Loading 3D campus',['elevator_cab.glb',meta.hospital_shell.file]);
