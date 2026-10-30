@@ -1910,7 +1910,7 @@ async function init() {
   try {
     const [manifest,campus]=await Promise.all([
       fetch('manifest.json').then(response=>{if(!response.ok)throw Error(`Manifest HTTP ${response.status}`);return response.json();}),
-      fetch('scene3d/campus_manifest_full_catalog.json?v=20261030-streamer-layout1').then(response=>{if(!response.ok)throw Error(`Campus HTTP ${response.status}`);return response.json();})
+      fetch('scene3d/campus_manifest_full_catalog.json?v=20261030-mask-pipeline1').then(response=>{if(!response.ok)throw Error(`Campus HTTP ${response.status}`);return response.json();})
     ]);
     state.entries=manifest.entries;
     fullCatalogById=new Map(campus.rooms.map(room=>[room.id,room]));
@@ -1983,11 +1983,16 @@ function loadBreathSequences(){
   return breathSequencePromise;
 }
 function setupStreamerMode(){
-  const panel=$('streamerWindow'),video=$('streamerVideo'),toggle=$('streamerToggle');
-  const status=$('streamerStatus'),retry=$('streamerRetry'),mirror=$('streamerMirror');
+  const panel=$('streamerWindow'),toggle=$('streamerToggle'),retry=$('streamerRetry');
   const handle=$('streamerDragHandle'),stage=$('captureStage'),layout=$('streamerLayout');
-  const horizontal=$('streamerHorizontal'),portrait=$('streamerPortrait');
-  let stream=null,generation=0,drag=null;
+  const horizontal=$('streamerHorizontal'),portrait=$('streamerPortrait'),theme=$('streamerTheme');
+  let drag=null;
+  function syncTheme(){theme.value=window.ZeBeZoTheme?.getTheme()||document.documentElement.dataset.zbTheme||'original';}
+  theme.addEventListener('change',()=>{
+    if(window.ZeBeZoTheme)window.ZeBeZoTheme.setTheme(theme.value);
+    else document.documentElement.dataset.zbTheme=theme.value;
+  });
+  addEventListener('zebezo:themechange',syncTheme);
   function clampCameraWindow(){
     if(panel.hidden)return;
     const frame=stage.getBoundingClientRect(),windowRect=panel.getBoundingClientRect();
@@ -1999,7 +2004,6 @@ function setupStreamerMode(){
     document.body.dataset.streamOrientation=orientation;
     horizontal.setAttribute('aria-pressed',String(orientation==='horizontal'));
     portrait.setAttribute('aria-pressed',String(orientation==='portrait'));
-    $('streamerDimensions').textContent=orientation==='portrait'?'1080 × 1920':'1920 × 1080';
     try{localStorage.setItem('zebezo-streamer-orientation-v1',orientation);}catch{}
     requestAnimationFrame(clampCameraWindow);
   }
@@ -2009,49 +2013,25 @@ function setupStreamerMode(){
   horizontal.addEventListener('click',()=>setOrientation('horizontal'));
   portrait.addEventListener('click',()=>setOrientation('portrait'));
   addEventListener('resize',()=>requestAnimationFrame(clampCameraWindow));
-  function stopCamera(){
-    generation++;
-    if(stream){for(const track of stream.getTracks())track.stop();stream=null;}
-    video.srcObject=null;
-  }
   function close(){
-    stopCamera();panel.hidden=true;retry.hidden=true;
+    window.StreamerMask.stop();window.StreamerMask.hideEditor();panel.hidden=true;retry.hidden=true;
     layout.hidden=true;document.body.classList.remove('streamer-mode');
     toggle.textContent='Streamer mode';toggle.setAttribute('aria-pressed','false');
-    status.textContent='Camera is off';
   }
   async function open(){
-    if(!panel.hidden && stream)return;
+    if(!panel.hidden)return;
     document.body.classList.add('streamer-mode');layout.hidden=false;
+    syncTheme();
     panel.hidden=false;toggle.textContent='Stop streamer mode';toggle.setAttribute('aria-pressed','true');
     requestAnimationFrame(clampCameraWindow);
-    status.textContent='Requesting camera…';retry.hidden=true;
-    const request=++generation;
-    try{
-      if(!navigator.mediaDevices?.getUserMedia)throw new Error('Camera access requires HTTPS or localhost.');
-      const acquired=await navigator.mediaDevices.getUserMedia({video:true,audio:false});
-      if(request!==generation){for(const track of acquired.getTracks())track.stop();return;}
-      stream=acquired;video.srcObject=stream;
-      await video.play();
-      status.textContent='Camera active · drag title to move · resize corner';
-    }catch(error){
-      if(request!==generation)return;
-      stopCamera();
-      status.textContent=error.name==='NotAllowedError'?'Camera permission was denied.':
-        error.name==='NotFoundError'?'No webcam was found.':error.message||'Could not start camera.';
-      retry.hidden=false;
-    }
+    await window.StreamerMask.start();
   }
   toggle.addEventListener('click',()=>{
     if(panel.hidden)open();else close();
   });
   $('streamerClose').addEventListener('click',close);
-  retry.addEventListener('click',open);
-  mirror.addEventListener('click',()=>{
-    const unmirrored=video.classList.toggle('unmirrored');
-    mirror.textContent=unmirrored?'Mirror off':'Mirror on';
-    mirror.setAttribute('aria-pressed',String(!unmirrored));
-  });
+  retry.addEventListener('click',()=>window.StreamerMask.start());
+  $('streamerEdit').addEventListener('click',()=>window.StreamerMask.showEditor());
   handle.addEventListener('pointerdown',event=>{
     if(event.target.closest('button'))return;
     const rect=panel.getBoundingClientRect(),frame=stage.getBoundingClientRect();
@@ -2068,7 +2048,6 @@ function setupStreamerMode(){
   function endDrag(event){if(drag?.id===event.pointerId){drag=null;panel.classList.remove('is-dragging');}}
   handle.addEventListener('pointerup',endDrag);
   handle.addEventListener('pointercancel',endDrag);
-  addEventListener('pagehide',stopCamera);
 }
 setupStreamerMode();
 init();

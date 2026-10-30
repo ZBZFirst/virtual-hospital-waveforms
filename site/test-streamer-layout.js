@@ -6,6 +6,8 @@ const html=fs.readFileSync('index.html','utf8');
 const css=fs.readFileSync('styles.css','utf8');
 assert(html.indexOf('id="captureStage"')<html.indexOf('id="hospitalScene"'));
 assert(html.indexOf('id="gridMonitor"')<html.lastIndexOf('</div>\n  <script'));
+assert(html.indexOf('id="streamerTheme"')>html.indexOf('id="streamerHorizontal"'));
+assert(!html.includes('<span>OBS Browser Source'));
 assert(css.includes('aspect-ratio: 16 / 9'));
 assert(css.includes('aspect-ratio: 9 / 16'));
 
@@ -24,8 +26,11 @@ function element(id){
 const bodyClasses=new Set();
 const body={dataset:{},classList:{add:value=>bodyClasses.add(value),remove:value=>bodyClasses.delete(value)}};
 let stopped=false;
+let themeValue='original';
 const context=vm.createContext({
-  $:element,document:{body},navigator:{mediaDevices:{getUserMedia:async()=>({getTracks:()=>[{stop:()=>{stopped=true;}}]})}},
+  $:element,document:{body,documentElement:{dataset:{}}},
+  window:{StreamerMask:{start:async()=>true,stop:()=>{stopped=true;},hideEditor:()=>{},showEditor:()=>{}},
+    ZeBeZoTheme:{getTheme:()=>themeValue,setTheme:value=>{themeValue=value;}}},
   localStorage:{getItem:key=>storage.get(key),setItem:(key,value)=>storage.set(key,value)},
   requestAnimationFrame:callback=>callback(),
   addEventListener:(name,callback)=>handlers.set(name,callback),
@@ -44,14 +49,12 @@ function click(id){element(id).listeners.get('click')();}
   assert.equal(element('streamerLayout').hidden,false);
   click('streamerPortrait');
   assert.equal(body.dataset.streamOrientation,'portrait');
-  assert.equal(element('streamerDimensions').textContent,'1080 × 1920');
   assert.equal(element('streamerPortrait')['aria-pressed'],'true');
   click('streamerHorizontal');
   assert.equal(body.dataset.streamOrientation,'horizontal');
-  assert.equal(element('streamerDimensions').textContent,'1920 × 1080');
-  for(let i=0;i<8 && element('streamerStatus').textContent!=='Camera active · drag title to move · resize corner';i++)
-    await Promise.resolve();
-  assert.match(element('streamerStatus').textContent,/Camera active/);
+  assert.equal(element('streamerHorizontal')['aria-pressed'],'true');
+  element('streamerTheme').value='dark';element('streamerTheme').listeners.get('change')();
+  assert.equal(themeValue,'dark','the grouped Theme control uses the site theme API');
   click('streamerToggle');
   assert(!bodyClasses.has('streamer-mode'));
   assert.equal(element('streamerLayout').hidden,true);

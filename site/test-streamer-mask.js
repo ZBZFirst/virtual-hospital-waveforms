@@ -1,0 +1,17 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const source=fs.readFileSync('streamer-mask.js','utf8');
+const begin=source.indexOf('function cameraError(');
+const end=source.indexOf('\n}\nasync function start(',begin);
+assert(begin>=0&&end>begin);
+const context=vm.createContext({});
+vm.runInContext(source.slice(begin,end+2),context);
+assert.match(context.cameraError({name:'NotReadableError',message:'Starting videoinput failed'}),/Close other camera apps/);
+assert.match(context.cameraError({name:'NotAllowedError'}),/permission was denied/);
+assert.match(context.cameraError({name:'NotFoundError'}),/No webcam/);
+assert(source.includes('outputCtx.drawImage(composite,0,0)'));
+assert(source.includes('previewCtx.drawImage(composite,0,0)'));
+assert(source.includes("composite.captureStream(30)"));
+console.log('Streamer mask pipeline reports busy cameras and uses the clean composite for output and recording');

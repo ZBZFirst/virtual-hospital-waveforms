@@ -127,14 +127,11 @@ body { overflow: hidden; }
 .streamer-titlebar strong { font-size: 12px; }
 .streamer-titlebar > div { display: flex; gap: 5px; }
 .streamer-titlebar button,.streamer-foot button { min-height: 28px; padding: 3px 7px; font-size: 11px; }
-.streamer-window video { display: block; width: 100%; flex: 1; min-height: 0; object-fit: cover; background: #061017; transform: scaleX(-1); }
-.streamer-window video.unmirrored { transform: none; }
 .streamer-foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 28px; padding: 4px 9px; color: #aad1da; font-size: 11px; }
 .streamer-window.is-dragging { opacity: .93; }
 @media(max-width:700px) { .streamer-window { top: 112px; right: 10px; width: min(270px,calc(100vw - 20px)); height: 215px; } .atlas-buttons #streamerToggle { grid-column: 1 / -1; } }
 .streamer-layout[hidden] { display: none; }
 .streamer-layout { position: fixed; z-index: 60; right: 12px; bottom: 72px; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; max-width: calc(100% - 24px); padding: 6px; background: #102b39f2; border: 1px solid #6bb7c4; border-radius: 8px; box-shadow: 0 8px 25px #0009; }
-.streamer-layout span { color: #d3edf2; font-size: 11px; white-space: nowrap; margin: 0 4px; }
 .streamer-layout button { padding: 5px 7px; font-size: 11px; white-space: nowrap; }
 .streamer-layout button[aria-pressed="true"] { background: #246e81; border-color: #76dbe3; }
 body.streamer-mode { background: #000; }
