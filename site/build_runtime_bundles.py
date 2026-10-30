@@ -9,7 +9,7 @@ PAGE = [
 ]
 SCENE = [
     'core', 'model-sizes', 'load-progress', 'screens-and-tablet', 'nursing-cube', 'patients-and-monitors',
-    'telemetry', 'vital-detail', 'navigation', 'unit-tour', 'events', 'frame',
+    'telemetry', 'vital-detail', 'vital-review', 'navigation', 'unit-tour', 'events', 'frame',
     'floor-loader', 'boot',
 ]
 

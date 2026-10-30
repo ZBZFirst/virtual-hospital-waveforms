@@ -26,13 +26,47 @@ document.querySelector('#openVent').addEventListener('click',()=>{
 });
 document.querySelector('#vitalTab').addEventListener('click',()=>selectVitalDetailTab('vital'));
 document.querySelector('#ventTab').addEventListener('click',()=>selectVitalDetailTab('vent'));
-document.querySelector('#vitalPlay').addEventListener('click',()=>{
+document.querySelector('#vitalLiveTab').addEventListener('click',()=>selectVitalMode('live'));
+document.querySelector('#vitalReviewTab').addEventListener('click',()=>selectVitalMode('review'));
+document.querySelector('#vitalLivePlay').addEventListener('click',()=>{
   if(!telemetryDetail)return;
   const sceneElapsed=exportElapsedSeconds??(performance.now()-playbackStart)/1000;
   if(telemetryDetail.paused)telemetryDetail.offset=sceneElapsed-telemetryDetail.elapsed;
   else telemetryDetail.elapsed=sceneElapsed-telemetryDetail.offset;
   telemetryDetail.paused=!telemetryDetail.paused;
-  document.querySelector('#vitalPlay').textContent=telemetryDetail.paused?'Resume':'Pause';
+  document.querySelector('#vitalLivePlay').textContent=telemetryDetail.paused?'Resume':'Pause';
+});
+document.querySelector('#vitalReviewPlay').addEventListener('click',()=>{
+  const detail=telemetryDetail;
+  if(!detail?.record || detail.mode!=='review')return;
+  if(!detail.reviewPlaying && detail.reviewSeconds>=detail.record.duration)setVitalReviewPosition(0);
+  detail.reviewPlaying=!detail.reviewPlaying;
+  detail.lastReviewFrame=performance.now();
+  document.querySelector('#vitalReviewPlay').textContent=detail.reviewPlaying?'Pause':'Play';
+});
+document.querySelector('#vitalScrub').addEventListener('input',event=>{
+  const record=telemetryDetail?.record;
+  if(record)setVitalReviewPosition(Number(event.target.value)/1000*record.duration);
+});
+for(const [id,direction] of [['vitalPrev',-1],['vitalNext',1]])
+  document.querySelector(`#${id}`).addEventListener('click',()=>{
+    const detail=telemetryDetail;
+    if(detail?.record)setVitalReviewPosition(detail.reviewSeconds+direction*Number(document.querySelector('#vitalWindow').value));
+  });
+const vitalOverviewCanvas=document.querySelector('#vitalOverview');
+function seekVitalOverview(event){
+  const record=telemetryDetail?.record;
+  if(!record)return;
+  const bounds=vitalOverviewCanvas.getBoundingClientRect();
+  const fraction=THREE.MathUtils.clamp((event.clientX-bounds.left-78)/(bounds.width-90),0,1);
+  setVitalReviewPosition(fraction*record.duration);
+}
+vitalOverviewCanvas.addEventListener('pointerdown',event=>{
+  vitalOverviewCanvas.setPointerCapture(event.pointerId);
+  seekVitalOverview(event);
+});
+vitalOverviewCanvas.addEventListener('pointermove',event=>{
+  if(vitalOverviewCanvas.hasPointerCapture(event.pointerId))seekVitalOverview(event);
 });
 document.querySelector('#vitalWindow').addEventListener('change',()=>{lastDetailPaint=0;if(telemetryDetail)telemetryDetail.ranges=null;});
 document.querySelector('#closeTelemetry').addEventListener('click',()=>{

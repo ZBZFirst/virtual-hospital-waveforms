@@ -36,6 +36,11 @@
     #telemetryDetail canvas { display: block; width: 100%; height: 180px; background: #08191f; }
     #telemetryDetail .vital-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     #telemetryDetail .vital-controls output { margin-left: auto; color: #a7cbd2; }
+    #telemetryDetail .vital-mode { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    #telemetryDetail .vital-review-controls { display: grid; grid-template-columns: auto minmax(100px,1fr) auto auto auto; align-items: center; gap: 8px; }
+    #telemetryDetail .vital-mode[hidden],#telemetryDetail .vital-review-controls[hidden],#vitalReviewPlay[hidden],#vitalLivePlay[hidden] { display: none; }
+    #vitalOverview { grid-column: 1 / -1; height: 240px!important; cursor: crosshair; }
+    @media(max-width:650px) { #telemetryDetail .vital-review-controls { grid-template-columns: auto 1fr auto; } #telemetryDetail .vital-review-controls label { grid-column: span 2; } }
     #telemetryDetail small { color: #afcdd4; }
     @media(max-width:650px) { #bar { top: 6px; left: 6px; right: 6px; gap: 5px; padding: 8px; max-height: 32vh; overflow: auto; } button { padding: 6px; } #help { font-size: 11px; } }
     html.embedded #bar { top: 160px; max-width: 780px; max-height: 26vh; overflow: auto; }
@@ -110,11 +115,13 @@
   <div id="cubeHint"></div>
   <section id="telemetryDetail" role="dialog" aria-modal="true" aria-label="Patient vital waveform detail">
     <header><strong id="telemetryTitle">Vital Waveforms</strong><button id="closeTelemetry">Close</button></header>
-    <div class="vital-controls"><button id="vitalTab" type="button" aria-pressed="true">Vital Waveforms</button><button id="ventTab" type="button" aria-pressed="false">Ventilator Waveforms</button><span id="vitalPlaybackControls"><button id="vitalPlay" type="button">Pause</button><label>Window <select id="vitalWindow"><option value="8">8 s</option><option value="15">15 s</option><option value="30" selected>30 s</option></select></label></span><output id="vitalProgress">Loading source waveform…</output></div>
+    <div class="vital-controls"><button id="vitalTab" type="button" aria-pressed="true">Vital Waveforms</button><button id="ventTab" type="button" aria-pressed="false">Ventilator Waveforms</button><span id="vitalPlaybackControls"><label>Window <select id="vitalWindow"><option value="8">8 s</option><option value="15">15 s</option><option value="30" selected>30 s</option></select></label></span><output id="vitalProgress">Loading source waveform…</output></div>
+    <nav id="vitalMode" class="vital-mode" aria-label="Vital waveform playback mode"><button id="vitalLiveTab" type="button" class="active" aria-pressed="true">Real-Time Feed</button><button id="vitalReviewTab" type="button" aria-pressed="false">Review Feed</button><button id="vitalLivePlay" type="button">Pause</button><button id="vitalReviewPlay" type="button" hidden>Play</button></nav>
+    <div id="vitalReviewControls" class="vital-review-controls" hidden><button id="vitalPrev" type="button" aria-label="Previous waveform window">←</button><input id="vitalScrub" type="range" min="0" max="1000" value="0" aria-label="Position in full vital recording"><button id="vitalNext" type="button" aria-label="Next waveform window">→</button><output id="vitalPosition">0:00 / 0:00</output><label>Speed <select id="vitalReviewSpeed"><option value="1">1×</option><option value="10">10×</option><option value="60">60×</option></select></label><canvas id="vitalOverview" aria-label="Overview of the complete vital waveform recording"></canvas></div>
     <p id="vitalNoSource" hidden></p>
     <div id="vitalCharts" class="vital-charts"><div class="vital-chart"><canvas id="vitalChart0" aria-label="ECG lead II waveform"></canvas></div><div class="vital-chart"><canvas id="vitalChart1" aria-label="Arterial pressure waveform"></canvas></div><div class="vital-chart"><canvas id="vitalChart2" aria-label="Central venous pressure waveform"></canvas></div><div class="vital-chart"><canvas id="vitalChart3" aria-label="Pulmonary arterial pressure waveform"></canvas></div></div>
     <small>Full PhysioNet MGH/MF source recording. Channels are shown only when present. <a href="https://physionet.org/content/mghdb/1.0.0/" target="_blank" rel="noopener" style="color:#9bdae9">Source and attribution</a></small>
   </section>
-  <script type="module" src="./viewer.js?v=20261030-full-waveforms1"></script>
+  <script type="module" src="./viewer.js?v=20261030-vital-review1"></script>
 </body>
 </html>

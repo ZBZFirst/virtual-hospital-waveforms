@@ -6,14 +6,14 @@
   <title>Ventilator and Telemetry Virtual Hospital</title>
   <link rel="canonical" href="https://www.zebezo.org/respiratory-therapy/ventilator-waveform-library/">
   <meta name="description" content="Explore 145 UC Davis ventilator recordings and 24 independent PhysioNet MGH telemetry recordings in a virtual hospital.">
-  <link rel="stylesheet" href="styles.css?v=20261030-full-waveforms1">
+  <link rel="stylesheet" href="styles.css?v=20261030-vital-review1">
   <link rel="stylesheet" href="unit-cubes.css?v=20261020-hospital-spacing">
   <link rel="stylesheet" href="grid-monitor.css?v=20261021-feed-toolbar">
 </head>
 <body>
   <main class="atlas-screen" aria-label="3D virtual hospitals">
     <canvas id="atlas" aria-hidden="true"></canvas>
-    <iframe id="hospitalScene" title="Interactive 3D virtual hospitals" src="scene3d/?view=hospital&amp;embedded=1&amp;v=20261030-full-waveforms1" loading="eager"></iframe>
+    <iframe id="hospitalScene" title="Interactive 3D virtual hospitals" src="scene3d/?view=hospital&amp;embedded=1&amp;v=20261030-vital-review1" loading="eager"></iframe>
     <div id="sceneLoading" class="scene-loading" role="status" aria-live="polite">
       <div class="scene-loading-card"><span class="scene-spinner" aria-hidden="true"></span><strong id="sceneLoadingTitle">Loading 3D hospitals…</strong><p id="sceneLoadingMessage">Preparing the hospital scene…</p><progress id="sceneLoadingProgress" max="100" aria-label="3D model download progress"></progress><output id="sceneLoadingAmount" aria-live="off">Waiting for scene assets…</output><button id="retryScene" type="button" hidden>Reload scene</button></div>
     </div>
@@ -105,7 +105,7 @@
   <script src="volume.js?v=20261008-volume1" defer></script>
   <script src="breath-metrics.js?v=20261008-breath-metrics1" defer></script>
   <script src="segment-store.js?v=20261008-segments1" defer></script>
-  <script src="feed-index-store.js?v=20261030-full-waveforms1" defer></script>
+  <script src="feed-index-store.js?v=20261030-vital-review1" defer></script>
   <script src="segmented-waveform.js?v=browser-room-2" defer></script>
   <script src="hospital-layout.js?v=20261008-floor-maps2" defer></script>
   <script src="hospital-system.js?v=20261020-hospital-spacing" defer></script>
@@ -117,7 +117,7 @@
   <script src="room-live.js?v=20261021-finite-feeds" defer></script>
   <script src="grid-monitor.js?v=20261021-finite-feeds" defer></script>
   <script src="unit-cubes.js?v=20261021-finite-feeds" defer></script>
-  <script src="page-runtime.js?v=20261030-full-waveforms1" defer></script>
+  <script src="page-runtime.js?v=20261030-vital-review1" defer></script>
   <dialog id="room-about"><form method="dialog"><button aria-label="Close">Close</button></form><h2>Room waveform perspectives</h2><p>ZeBeZo cards show observational measures calculated from loaded 50 Hz samples after a completed BS/BE breath. Hahnicity cards show experimental JavaScript ports of selected ventMAP metadata, ventparliament mechanics, and PVA heuristic calculations. They run in this browser; Python repository functions are not executed on the server. A card can lag while analysis runs. Neither perspective changes waveform playback. This is not a clinical tool.</p></dialog>
 </body>
 </html>

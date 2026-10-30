@@ -1,13 +1,15 @@
 function openVitalDetail(assignment, source='vital') {
   const panel=document.querySelector('#telemetryDetail');
-  telemetryDetail={assignment,source,paused:false,elapsed:null,offset:0};
+  telemetryDetail={assignment,source,mode:'live',paused:false,elapsed:null,offset:0,
+    reviewSeconds:null,reviewPlaying:false,lastReviewFrame:0,overview:null,ranges:null};
   movementKeys.clear();
   document.querySelector('#telemetryTitle').textContent=`${assignment.id} · Patient Waveforms`;
-  document.querySelector('#vitalPlay').textContent='Pause';
+  document.querySelector('#vitalLivePlay').textContent='Pause';
   document.querySelector('#vitalProgress').textContent='Loading full source waveform…';
   panel.classList.add('open');
   document.querySelector('#closeTelemetry').focus();
   selectVitalDetailTab(source);
+  if(source==='vital' && assignment.telemetry_record)selectVitalMode('live');
   paintTelemetryDetail(performance.now());
 }
 
@@ -30,6 +32,8 @@ function selectVitalDetailTab(source) {
   const hasSource=vital?Boolean(assignment.telemetry_record):Boolean(assignment.uc_davis_recording);
   document.querySelector('#vitalCharts').hidden=!vital||!hasSource;
   document.querySelector('#vitalPlaybackControls').hidden=!vital||!hasSource;
+  document.querySelector('#vitalMode').hidden=!vital||!hasSource;
+  document.querySelector('#vitalReviewControls').hidden=!vital||!hasSource||telemetryDetail.mode!=='review';
   const empty=document.querySelector('#vitalNoSource');
   empty.hidden=hasSource;
   if(!hasSource){
@@ -38,13 +42,14 @@ function selectVitalDetailTab(source) {
   } else document.querySelector('#vitalProgress').textContent='Loading full source waveform…';
 }
 
-function vitalDetailRanges(record, elapsed, seconds) {
+function vitalDetailRanges(record, elapsed, seconds, wrap=true) {
   const end=recordClock(record,elapsed),start=end-Math.round(seconds*record.fs);
   return channels.map(channel=>{
     const info=record.channels[channel.key.toLowerCase()];
     if(!info)return [channel.min,channel.max];
     let low=Infinity,high=-Infinity;
     for(let clock=start;clock<end;clock++){
+      if(!wrap && (clock<0 || clock>=record.samples))continue;
       const sample=((clock%record.samples)+record.samples)%record.samples;
       const digital=decodeWindowSample(sample,info.index,record.count,record.parts);
       if(digital===null)continue;
@@ -57,7 +62,7 @@ function vitalDetailRanges(record, elapsed, seconds) {
   });
 }
 
-function drawVitalChart(canvas, record, channel, range, elapsed, seconds) {
+function drawVitalChart(canvas, record, channel, range, elapsed, seconds, reviewPosition=null) {
   const pixelRatio=Math.min(devicePixelRatio||1,2);
   const width=Math.max(360,Math.round(canvas.clientWidth*pixelRatio));
   const height=Math.round(180*pixelRatio);
@@ -84,6 +89,7 @@ function drawVitalChart(canvas, record, channel, range, elapsed, seconds) {
     const to=start+Math.max(1,Math.floor((x+1)*(end-start)/plotW));
     let lo=Infinity,hi=-Infinity;
     for(let clock=from;clock<to;clock++){
+      if(reviewPosition!==null && (clock<0 || clock>=record.samples))continue;
       const sample=((clock%record.samples)+record.samples)%record.samples;
       const digital=decodeWindowSample(sample,info.index,record.count,record.parts);
       if(digital===null)continue;
@@ -102,7 +108,9 @@ function drawVitalChart(canvas, record, channel, range, elapsed, seconds) {
   c.fillStyle='#91aeb6';c.font='11px system-ui';
   for(let tick=0;tick<=4;tick++){
     const x=left+tick*plotW/4;
-    c.fillText(`${Math.round(seconds*(tick/4-1))} s`,x-10,h-7);
+    const label=reviewPosition===null?`${Math.round(seconds*(tick/4-1))} s`:
+      formatVitalTime(Math.max(0,reviewPosition-seconds+tick*seconds/4));
+    c.fillText(label,x-10,h-7);
   }
 }
 
@@ -111,16 +119,24 @@ async function paintTelemetryDetail(now) {
   lastDetailPaint=now;
   const detail=telemetryDetail;
   const sceneElapsed=exportElapsedSeconds??(now-playbackStart)/1000;
-  const elapsed=detail.paused?detail.elapsed:sceneElapsed-detail.offset;
   try{
     const record=await getRecord(detail.assignment.telemetry_record);
     if(telemetryDetail!==detail)return;
+    if(detail.mode==='review' && detail.reviewSeconds===null)return;
+    if(detail.mode==='review')advanceVitalReview(detail,record,now);
+    const mode=detail.mode,reviewPosition=detail.reviewSeconds;
+    const elapsed=mode==='review'?reviewPosition-(record.startSeconds||0):
+      detail.paused?detail.elapsed:sceneElapsed-detail.offset;
     const seconds=Number(document.querySelector('#vitalWindow').value);
-    await fillRecordCache(record,elapsed,seconds);
-    if(telemetryDetail!==detail || !isCached(record,elapsed,0,seconds))return;
-    detail.ranges ||= vitalDetailRanges(record,elapsed,seconds);
-    const sourceTime=((recordClock(record,elapsed)%record.samples)+record.samples)%record.samples/record.fs;
-    document.querySelector('#vitalProgress').textContent=`Full ${record.fs} Hz source · ${Math.floor(sourceTime/60)}:${String(Math.floor(sourceTime%60)).padStart(2,'0')} / ${Math.floor(record.duration/60)}:${String(Math.floor(record.duration%60)).padStart(2,'0')}`;
-    channels.forEach((channel,index)=>drawVitalChart(document.querySelector(`#vitalChart${index}`),record,channel,detail.ranges[index],elapsed,seconds));
+    const history=mode==='review'?Math.min(seconds,reviewPosition):seconds;
+    await fillRecordCache(record,elapsed,history);
+    if(telemetryDetail!==detail || detail.mode!==mode || (mode==='review' && detail.reviewSeconds!==reviewPosition) ||
+      !isCached(record,elapsed,0,history))return;
+    detail.ranges ||= vitalDetailRanges(record,elapsed,seconds,mode!=='review');
+    const sourceTime=mode==='review'?reviewPosition:
+      ((recordClock(record,elapsed)%record.samples)+record.samples)%record.samples/record.fs;
+    document.querySelector('#vitalProgress').textContent=`Full ${record.fs} Hz source · ${formatVitalTime(sourceTime)} / ${formatVitalTime(record.duration)}`;
+    channels.forEach((channel,index)=>drawVitalChart(document.querySelector(`#vitalChart${index}`),record,channel,detail.ranges[index],elapsed,seconds,mode==='review'?reviewPosition:null));
+    if(mode==='review')drawVitalOverview(detail,record);
   }catch(error){if(telemetryDetail===detail)document.querySelector('#vitalProgress').textContent=`Vital waveform unavailable: ${error.message}`;}
 }
