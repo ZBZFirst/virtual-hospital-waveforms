@@ -1910,7 +1910,7 @@ async function init() {
   try {
     const [manifest,campus]=await Promise.all([
       fetch('manifest.json').then(response=>{if(!response.ok)throw Error(`Manifest HTTP ${response.status}`);return response.json();}),
-      fetch('scene3d/campus_manifest_full_catalog.json?v=20261030-vital-handoff1').then(response=>{if(!response.ok)throw Error(`Campus HTTP ${response.status}`);return response.json();})
+      fetch('scene3d/campus_manifest_full_catalog.json?v=20261030-streamer-layout1').then(response=>{if(!response.ok)throw Error(`Campus HTTP ${response.status}`);return response.json();})
     ]);
     state.entries=manifest.entries;
     fullCatalogById=new Map(campus.rooms.map(room=>[room.id,room]));
@@ -1985,8 +1985,30 @@ function loadBreathSequences(){
 function setupStreamerMode(){
   const panel=$('streamerWindow'),video=$('streamerVideo'),toggle=$('streamerToggle');
   const status=$('streamerStatus'),retry=$('streamerRetry'),mirror=$('streamerMirror');
-  const handle=$('streamerDragHandle');
+  const handle=$('streamerDragHandle'),stage=$('captureStage'),layout=$('streamerLayout');
+  const horizontal=$('streamerHorizontal'),portrait=$('streamerPortrait');
   let stream=null,generation=0,drag=null;
+  function clampCameraWindow(){
+    if(panel.hidden)return;
+    const frame=stage.getBoundingClientRect(),windowRect=panel.getBoundingClientRect();
+    panel.style.left=`${Math.max(0,Math.min(stage.clientWidth-panel.offsetWidth,windowRect.left-frame.left))}px`;
+    panel.style.top=`${Math.max(0,Math.min(stage.clientHeight-panel.offsetHeight,windowRect.top-frame.top))}px`;
+    panel.style.right='auto';
+  }
+  function setOrientation(orientation){
+    document.body.dataset.streamOrientation=orientation;
+    horizontal.setAttribute('aria-pressed',String(orientation==='horizontal'));
+    portrait.setAttribute('aria-pressed',String(orientation==='portrait'));
+    $('streamerDimensions').textContent=orientation==='portrait'?'1080 × 1920':'1920 × 1080';
+    try{localStorage.setItem('zebezo-streamer-orientation-v1',orientation);}catch{}
+    requestAnimationFrame(clampCameraWindow);
+  }
+  let savedOrientation='horizontal';
+  try{if(localStorage.getItem('zebezo-streamer-orientation-v1')==='portrait')savedOrientation='portrait';}catch{}
+  setOrientation(savedOrientation);
+  horizontal.addEventListener('click',()=>setOrientation('horizontal'));
+  portrait.addEventListener('click',()=>setOrientation('portrait'));
+  addEventListener('resize',()=>requestAnimationFrame(clampCameraWindow));
   function stopCamera(){
     generation++;
     if(stream){for(const track of stream.getTracks())track.stop();stream=null;}
@@ -1994,12 +2016,15 @@ function setupStreamerMode(){
   }
   function close(){
     stopCamera();panel.hidden=true;retry.hidden=true;
+    layout.hidden=true;document.body.classList.remove('streamer-mode');
     toggle.textContent='Streamer mode';toggle.setAttribute('aria-pressed','false');
     status.textContent='Camera is off';
   }
   async function open(){
     if(!panel.hidden && stream)return;
+    document.body.classList.add('streamer-mode');layout.hidden=false;
     panel.hidden=false;toggle.textContent='Stop streamer mode';toggle.setAttribute('aria-pressed','true');
+    requestAnimationFrame(clampCameraWindow);
     status.textContent='Requesting camera…';retry.hidden=true;
     const request=++generation;
     try{
@@ -2029,15 +2054,15 @@ function setupStreamerMode(){
   });
   handle.addEventListener('pointerdown',event=>{
     if(event.target.closest('button'))return;
-    const rect=panel.getBoundingClientRect();
-    drag={id:event.pointerId,x:event.clientX,y:event.clientY,left:rect.left,top:rect.top};
-    panel.style.left=`${rect.left}px`;panel.style.top=`${rect.top}px`;panel.style.right='auto';
+    const rect=panel.getBoundingClientRect(),frame=stage.getBoundingClientRect();
+    drag={id:event.pointerId,x:event.clientX,y:event.clientY,left:rect.left-frame.left,top:rect.top-frame.top};
+    panel.style.left=`${drag.left}px`;panel.style.top=`${drag.top}px`;panel.style.right='auto';
     handle.setPointerCapture(event.pointerId);panel.classList.add('is-dragging');
   });
   handle.addEventListener('pointermove',event=>{
     if(!drag||event.pointerId!==drag.id)return;
-    const left=Math.max(0,Math.min(innerWidth-panel.offsetWidth,drag.left+event.clientX-drag.x));
-    const top=Math.max(0,Math.min(innerHeight-panel.offsetHeight,drag.top+event.clientY-drag.y));
+    const left=Math.max(0,Math.min(stage.clientWidth-panel.offsetWidth,drag.left+event.clientX-drag.x));
+    const top=Math.max(0,Math.min(stage.clientHeight-panel.offsetHeight,drag.top+event.clientY-drag.y));
     panel.style.left=`${left}px`;panel.style.top=`${top}px`;
   });
   function endDrag(event){if(drag?.id===event.pointerId){drag=null;panel.classList.remove('is-dragging');}}
