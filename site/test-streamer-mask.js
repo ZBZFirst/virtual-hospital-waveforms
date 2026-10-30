@@ -11,7 +11,20 @@ vm.runInContext(source.slice(begin,end+2),context);
 assert.match(context.cameraError({name:'NotReadableError',message:'Starting videoinput failed'}),/Close other camera apps/);
 assert.match(context.cameraError({name:'NotAllowedError'}),/permission was denied/);
 assert.match(context.cameraError({name:'NotFoundError'}),/No webcam/);
-assert(source.includes('outputCtx.drawImage(composite,0,0)'));
+const cropStart=source.indexOf('function cropBounds(');
+const cropEnd=source.indexOf('\nfunction currentCrop()',cropStart);
+assert(cropStart>=0&&cropEnd>cropStart);
+vm.runInContext('const clamp=(n,lo,hi)=>Math.max(lo,Math.min(hi,n));\n'+source.slice(cropStart,cropEnd),context);
+const crop=(regions,id,mode,padding,width=1280,height=720)=>
+  JSON.parse(JSON.stringify(context.cropBounds(regions,id,mode,padding,width,height)));
+const shapes=[{id:1,x:.6,y:.2,w:.2,h:.5},{id:2,x:.1,y:.1,w:.1,h:.2}];
+assert.deepEqual(crop(shapes,1,'selected',0),{x:768,y:144,width:256,height:360,active:true});
+assert.deepEqual(crop(shapes,1,'all',0),{x:128,y:72,width:896,height:432,active:true});
+assert.deepEqual(crop(shapes,1,'full',0),{x:0,y:0,width:1280,height:720,active:false});
+assert.deepEqual(crop([],null,'selected',8),{x:0,y:0,width:1280,height:720,active:false});
+assert.deepEqual(crop([{id:3,x:.9,y:.9,w:.1,h:.1}],3,'selected',30),
+  {x:1113,y:626,width:167,height:94,active:true});
+assert(source.includes('outputCtx.drawImage(framed,0,0)'));
 assert(source.includes('previewCtx.drawImage(composite,0,0)'));
-assert(source.includes("composite.captureStream(30)"));
-console.log('Streamer mask pipeline reports busy cameras and uses the clean composite for output and recording');
+assert(source.includes('framed.captureStream(30)'));
+console.log('Streamer mask pipeline crops the output and recording while keeping the full editor preview');

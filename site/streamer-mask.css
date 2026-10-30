@@ -24,6 +24,9 @@ body.streamer-mode .atlas-footer > .zb-theme-switcher { display: none; }
 .mask-pane .mask-check input { margin: 0; }
 .mask-pane output { float: right; color: #83d5d4; }
 .mask-pane small { display: block; color: #b1cbd1; line-height: 1.4; }
+.mask-framing { margin: 12px 0; padding: 8px; border: 1px solid #456b73; border-radius: 6px; background: #102832; }
+.mask-framing > strong { color: #e4f7f8; font-size: 12px; }
+.mask-framing button { width: 100%; margin-top: 8px; }
 .mask-meter { margin-top: 9px; padding: 8px; border: 1px solid #365662; border-radius: 6px; background: #102832; }
 .mask-meter-bars { display: flex; gap: 2px; height: 12px; margin: 6px 0; padding: 2px; background: #071b23; }
 .mask-meter-bars span { flex: 1; background: #2b4850; }
