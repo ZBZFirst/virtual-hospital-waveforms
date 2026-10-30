@@ -86,7 +86,8 @@ async function fillRecordCache(record, elapsed) {
         ranges[channel.key.toLowerCase()] = [center - half, center + half];
       }
     }
-    record.chartRanges = ranges;
+    // Keep a recording's display scale steady when the byte-range cache advances.
+    record.chartRanges ||= ranges;
   })();
   try { await record.loading; } finally { record.loading = null; }
 }

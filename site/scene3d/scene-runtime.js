@@ -110,15 +110,21 @@ function updateUcVentWindow(message) {
         THREE.MathUtils.lerp(window.flow[index],window.flow[next],a):null;
       const p=Number.isFinite(window.pressure[index])&&Number.isFinite(window.pressure[next])?
         THREE.MathUtils.lerp(window.pressure[index],window.pressure[next],a):null;
+      const sourceVolume=Array.isArray(window.volume)&&Number.isFinite(window.volume[index])&&Number.isFinite(window.volume[next])?
+        THREE.MathUtils.lerp(window.volume[index],window.volume[next],a):null;
       if(f!==null && previous<=1 && f>1)cumulative=0;
       cumulative=f===null?0:cumulative+f/3;
-      flow.push(f);pressure.push(p);volume.push(f===null?null:cumulative);
+      flow.push(f);pressure.push(p);volume.push(sourceVolume??(f===null?null:cumulative));
       previous=f??0;
     }
     const cycle=values=>values.concat(values,values);
-    const record={room:assignment.room,external:true,sourceSeconds:window.sourceSeconds,
+    const stable=window.ranges;
+    const previousRecord=ucVentByRoom.get(assignment.id);
+    const record={room:assignment.room,recording:window.recording,external:true,sourceSeconds:window.sourceSeconds,
       pressure_cm_h2o:cycle(pressure),flow_l_min:cycle(flow),volume_ml:cycle(volume),
-      pressureRange:range(pressure,2),flowRange:range(flow,5),volumeRange:range(volume,15)};
+      pressureRange:stable?.pressure || previousRecord?.pressureRange || range(pressure,2),
+      flowRange:stable?.flow || previousRecord?.flowRange || range(flow,5),
+      volumeRange:stable?.volume || previousRecord?.volumeRange || range(volume,15)};
     ucVentByRoom.set(assignment.id,record);
   }
 }
@@ -290,50 +296,86 @@ function makeFloorBadge(level) {
   return badge;
 }
 
-function drawVentScreen(canvas, record, elapsed) {
+function drawVentScreen(canvas, record, elapsed, screen) {
   const c = canvas.getContext('2d');
-  c.fillStyle = '#07181e'; c.fillRect(0, 0, 640, 400);
+  const reset = !screen || !record.external || screen.sweepRecording !== record.recording ||
+    !Number.isFinite(screen.lastSourceSeconds) || record.sourceSeconds < screen.lastSourceSeconds ||
+    record.sourceSeconds - screen.lastSourceSeconds > 5;
+  if (reset) { c.fillStyle = '#07181e'; c.fillRect(0, 0, 640, 400); }
+  if (!reset && record.sourceSeconds <= screen.lastSourceSeconds) return false;
+  if (reset) {
   c.fillStyle = '#cce4e7'; c.font = 'bold 19px system-ui';
   c.fillText(`VENTILATOR · ROOM ${String(record.room).padStart(2, '0')}`, 18, 28);
   c.fillStyle = '#7fa5aa'; c.font = '12px system-ui';
   c.fillText(record.external?'UC Davis 10 Hz visual track · full 50 Hz feed in detail':
     'Recorded pressure + flow · calculated volume · 10 s loop', 18, 46);
+  }
   const rows = [
     ['pressure_cm_h2o', 'P cmH₂O', '#f0a256', record.pressureRange],
     ['flow_l_min', 'Flow L/min', '#79e1a0', record.flowRange],
     ['volume_ml', 'V calc mL', '#65d3e1', record.volumeRange],
   ];
   const start = record.external?0:Math.min(499, Math.floor((elapsed % 10) * 50));
+  const count = record.external && !reset
+    ? Math.min(250, Math.max(1, Math.round((record.sourceSeconds - screen.lastSourceSeconds) * 50))) : 250;
+  const first = record.external ? 250 - count : 0;
+  const plotLeft = 132, plotWidth = 490, plotSamples = 250;
+  if (reset && screen) {
+    screen.sweepStep = 0;
+    screen.sweepPoints = Array(3).fill(null);
+    screen.sweepRecording = record.recording;
+  }
   for (let j = 0; j < 3; j++) {
     const [key, label, color, range] = rows[j];
     const y = 65 + j * 107;
-    c.fillStyle = j % 2 ? '#0d232a' : '#0b1e25'; c.fillRect(9, y, 622, 103);
-    c.fillStyle = color; c.font = 'bold 17px system-ui'; c.fillText(label, 18, y + 26);
-    c.fillStyle = '#88aab0'; c.font = '12px system-ui';
-    c.fillText(`${range[0].toFixed(0)} to ${range[1].toFixed(0)}`, 18, y + 46);
-    c.strokeStyle = '#24464d'; c.lineWidth = 1;
-    for (let k = 0; k < 6; k++) {
-      const x = 132 + k * 98;
-      c.beginPath(); c.moveTo(x, y + 5); c.lineTo(x, y + 98); c.stroke();
+    if (reset) {
+      c.fillStyle = j % 2 ? '#0d232a' : '#0b1e25'; c.fillRect(9, y, 622, 103);
+      c.fillStyle = color; c.font = 'bold 17px system-ui'; c.fillText(label, 18, y + 26);
+      c.fillStyle = '#88aab0'; c.font = '12px system-ui';
+      c.fillText(`${range[0].toFixed(0)} to ${range[1].toFixed(0)}`, 18, y + 46);
+      c.strokeStyle = '#24464d'; c.lineWidth = 1;
+      for (let k = 0; k < 6; k++) {
+        const x = plotLeft + k * 98;
+        c.beginPath(); c.moveTo(x, y + 5); c.lineTo(x, y + 98); c.stroke();
+      }
     }
     const values = record[key];
     if (!Array.isArray(values)) {
       c.fillStyle = '#8da8ad'; c.fillText('NO SOURCE', 144, y + 55);
       continue;
     }
-    c.strokeStyle = color; c.lineWidth = 2; c.beginPath();
-    let started = false, plotted = 0;
-    for (let i = 0; i < 250; i++) {
+    c.strokeStyle = color; c.lineWidth = 2;
+    let plotted = 0, previous = screen?.sweepPoints?.[j] || null;
+    for (let i = first; i < 250; i++) {
+      const step = (screen?.sweepStep || 0) + i - first;
+      const column = step % plotSamples;
+      const x = plotLeft + column * plotWidth / (plotSamples - 1);
+      if (record.external) {
+        c.fillStyle = j % 2 ? '#0d232a' : '#0b1e25';
+        c.fillRect(x - 1, y + 5, 3, 93);
+        if (column % 50 === 0) {
+          c.strokeStyle = '#24464d'; c.lineWidth = 1; c.beginPath();
+          c.moveTo(x, y + 5); c.lineTo(x, y + 98); c.stroke();
+          c.strokeStyle = color; c.lineWidth = 2;
+        }
+      }
       const value = values[start + i];
-      if (!Number.isFinite(value)) { started = false; continue; }
-      const x = 132 + i * 490 / 249;
-      const plotY = y + 93 - (value - range[0]) / (range[1] - range[0]) * 83;
-      if (!started) c.moveTo(x, plotY); else c.lineTo(x, plotY);
-      started = true; plotted++;
+      if (!Number.isFinite(value)) { previous = null; continue; }
+      const plotY = y + 93 - Math.max(0,Math.min(1,(value - range[0]) / (range[1] - range[0] || 1))) * 83;
+      c.beginPath();
+      if (previous && column > 0 && previous.step === step - 1) c.moveTo(previous.x, previous.y);
+      else c.moveTo(x, plotY);
+      c.lineTo(x, plotY); c.stroke();
+      previous = {step,x,y:plotY}; plotted++;
     }
-    if (plotted) c.stroke();
-    else { c.fillStyle = '#8da8ad'; c.fillText('NO SAMPLES', 144, y + 55); }
+    if (screen) screen.sweepPoints[j] = previous;
+    if (!plotted && reset) { c.fillStyle = '#8da8ad'; c.fillText('NO SAMPLES', 144, y + 55); }
   }
+  if (screen && record.external) {
+    screen.sweepStep += count;
+    screen.lastSourceSeconds = record.sourceSeconds;
+  }
+  return true;
 }
 
 function drawVentilatorsFrame(elapsed, frustum) {
@@ -344,7 +386,7 @@ function drawVentilatorsFrame(elapsed, frustum) {
     if (!frustum.intersectsBox(screen.worldBox)) return;
     const record = ventRecordForRoom(i + 1);
     if(!record)return;
-    drawVentScreen(screen.canvas, record, elapsed);
+    if (!drawVentScreen(screen.canvas, record, elapsed, screen)) return;
     screen.texture.needsUpdate = true;
     screen.lastDrawElapsed = elapsed;
     screen.drawCount = (screen.drawCount || 0) + 1;
@@ -1056,7 +1098,8 @@ async function fillRecordCache(record, elapsed) {
         ranges[channel.key.toLowerCase()] = [center - half, center + half];
       }
     }
-    record.chartRanges = ranges;
+    // Keep a recording's display scale steady when the byte-range cache advances.
+    record.chartRanges ||= ranges;
   })();
   try { await record.loading; } finally { record.loading = null; }
 }
@@ -2109,7 +2152,7 @@ async function boot() {
   [meta, campusManifest, catalogConfig] = await Promise.all([
     fetch('./scene_meta.json').then(r => r.json()),
     fetch('./campus_manifest_full_catalog.json').then(r=>r.json()),
-    fetch('./catalog_config.json?v=20261030-room-monitor-sync1').then(r=>r.json()),
+    fetch('./catalog_config.json?v=20261030-stable-sweep1').then(r=>r.json()),
   ]);
   telemetryBase = new URL(catalogConfig.mgh_base,location.href).href;
   modelBase = new URL(catalogConfig.model_base || './',location.href).href;

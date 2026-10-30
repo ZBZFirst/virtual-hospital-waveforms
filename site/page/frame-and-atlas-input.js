@@ -1,5 +1,35 @@
+function previewRanges(entry) {
+  if (entry.previewRanges) return entry.previewRanges;
+  const bytes = entry.previewBytes;
+  const previewVolume = new Float32Array(entry.signalBins);
+  let flowMin = Infinity, flowMax = -Infinity, pressureMin = Infinity, pressureMax = -Infinity;
+  let volume = 0, volumeMin = 0, volumeMax = 0, previousFlow = 0;
+  for (let i = 0; i < entry.signalBins; i++) {
+    const flowByte = bytes[i * 2], pressureByte = bytes[i * 2 + 1];
+    if (flowByte === 255 || pressureByte === 255) {
+      previousFlow = 0; volume = 0; previewVolume[i] = NaN; continue;
+    }
+    const flow = (flowByte - 127) * 60 / 127, pressure = pressureByte / 5;
+    flowMin = Math.min(flowMin, flow); flowMax = Math.max(flowMax, flow);
+    pressureMin = Math.min(pressureMin, pressure); pressureMax = Math.max(pressureMax, pressure);
+    if (previousFlow <= 1 && flow > 1) volume = 0;
+    volume += flow * 5 / 3;
+    previewVolume[i] = volume;
+    volumeMin = Math.min(volumeMin, volume); volumeMax = Math.max(volumeMax, volume);
+    previousFlow = flow;
+  }
+  const padded = (low, high, pad) => Number.isFinite(low)
+    ? [low - Math.max(pad, (high - low) * .08), high + Math.max(pad, (high - low) * .08)] : [0, 1];
+  entry.previewVolume = previewVolume;
+  return entry.previewRanges = {
+    pressure: padded(pressureMin, pressureMax, 2),
+    flow: padded(flowMin, flowMax, 5),
+    volume: padded(volumeMin, volumeMax, 15),
+  };
+}
+
 function frame(now) {
-  if(state.signals&&!document.hidden&&now-(state.lastSceneSignalTime||0)>100){
+  if(state.signals&&!document.hidden&&now-(state.lastSceneSignalTime||0)>50){
     const scene=els.hospitalScene?.contentWindow;
     const ward=scene?.wardViewer;
     if(ward && !ward.hospitalView && !ward.expandedHospital){
@@ -8,16 +38,22 @@ function frame(now) {
         const assignment=ward.roomAssignment(ward.activeHospital,ward.activeFloor,room);
         if(!assignment?.uc_davis_recording)continue;
         const entry=state.entries.find(item=>item.name===assignment.uc_davis_recording);
-        if(!entry)continue;
+        if(!entry?.previewBytes)continue;
         const duration=entry.samples/RATE;
         const end=feedClock(entry)%duration;
-        const flow=[],pressure=[];
+        const ranges=previewRanges(entry);
+        const flow=[],pressure=[],volume=[];
         for(let index=0;index<50;index++){
           const sampleTime=((end-5+index/10)%duration+duration)%duration;
           const sample=signalAt(entry,sampleTime);
           flow.push(sample?.flow??null);pressure.push(sample?.pressure??null);
+          const bin=Math.min(entry.signalBins-1,Math.floor(sampleTime*10));
+          const volumeValue=entry.previewVolume[bin];
+          volume.push(Number.isFinite(volumeValue)?volumeValue:null);
         }
-        rooms.push({id:assignment.id,recording:entry.name,sourceSeconds:end,flow,pressure});
+        rooms.push({id:assignment.id,recording:entry.name,sourceSeconds:end,flow,pressure,
+          volume,
+          ranges});
       }
       if(rooms.length)scene.postMessage({type:'zebezo-ward-windows',rooms},location.origin);
     }

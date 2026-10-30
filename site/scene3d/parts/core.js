@@ -107,15 +107,21 @@ function updateUcVentWindow(message) {
         THREE.MathUtils.lerp(window.flow[index],window.flow[next],a):null;
       const p=Number.isFinite(window.pressure[index])&&Number.isFinite(window.pressure[next])?
         THREE.MathUtils.lerp(window.pressure[index],window.pressure[next],a):null;
+      const sourceVolume=Array.isArray(window.volume)&&Number.isFinite(window.volume[index])&&Number.isFinite(window.volume[next])?
+        THREE.MathUtils.lerp(window.volume[index],window.volume[next],a):null;
       if(f!==null && previous<=1 && f>1)cumulative=0;
       cumulative=f===null?0:cumulative+f/3;
-      flow.push(f);pressure.push(p);volume.push(f===null?null:cumulative);
+      flow.push(f);pressure.push(p);volume.push(sourceVolume??(f===null?null:cumulative));
       previous=f??0;
     }
     const cycle=values=>values.concat(values,values);
-    const record={room:assignment.room,external:true,sourceSeconds:window.sourceSeconds,
+    const stable=window.ranges;
+    const previousRecord=ucVentByRoom.get(assignment.id);
+    const record={room:assignment.room,recording:window.recording,external:true,sourceSeconds:window.sourceSeconds,
       pressure_cm_h2o:cycle(pressure),flow_l_min:cycle(flow),volume_ml:cycle(volume),
-      pressureRange:range(pressure,2),flowRange:range(flow,5),volumeRange:range(volume,15)};
+      pressureRange:stable?.pressure || previousRecord?.pressureRange || range(pressure,2),
+      flowRange:stable?.flow || previousRecord?.flowRange || range(flow,5),
+      volumeRange:stable?.volume || previousRecord?.volumeRange || range(volume,15)};
     ucVentByRoom.set(assignment.id,record);
   }
 }
