@@ -29,7 +29,7 @@
     html.embedded #telemetryDetail { top: 140px; }
     html.embedded #help { bottom: 94px; }
     @media(max-width:650px) { html.embedded #bar { top: 155px; max-height: 46vh; } html.embedded #telemetryDetail { top: 165px; } html.embedded #toggleControls { display: inline-block; margin-left: auto; } html.embedded body.controls-collapsed #bar > :not(strong):not(#toggleControls):not(#status) { display: none; } html.embedded body.controls-collapsed #bar { max-height: 100px; } }
-    #bar { max-width: 860px; display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 9px 11px; overflow: visible; }
+    #bar { max-width: 860px; display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 6px; padding: 9px 11px; overflow: visible; }
     #bar > strong { margin: 0; }
     .toolbar-row { display: flex; align-items: stretch; gap: 6px; min-width: 0; }
     #viewRow, #patientRow, #motionRow { flex: 0 0 36px; height: 36px; }
@@ -99,6 +99,6 @@
     <canvas id="telemetryCanvas" width="1200" height="720"></canvas>
     <small>Full PhysioNet MGH/MF source recording. Channels are shown only when present in the source. <a href="https://physionet.org/content/mghdb/1.0.0/" target="_blank" rel="noopener" style="color:#9bdae9">Source and attribution</a></small>
   </section>
-  <script type="module" src="./viewer.js?v=20261029-tablet-sweep6"></script>
+  <script type="module" src="./viewer.js?v=20261029-tablet-sweep7"></script>
 </body>
 </html>
