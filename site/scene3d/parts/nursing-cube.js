@@ -16,11 +16,8 @@ function makeGrandCube(hospitalId) {
     {floor:6,position:[0,-half,0],rotation:[Math.PI/2,0,Math.PI]},
   ];
   const faces = definitions.map(({floor,position,rotation}) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = 1280;
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    const material = new THREE.MeshBasicMaterial({map:texture,toneMapped:false,depthTest:true,depthWrite:true});
+    const {canvas,texture,material}=makeMonitorSurface('unit',1280,1280,
+      {side:THREE.FrontSide});
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(surface,surface),material);
     mesh.name = `Nursing cube · floor ${floor}`;
     mesh.position.set(...position);
@@ -212,53 +209,9 @@ renderer.domElement.addEventListener('pointercancel',event=>{
 renderer.domElement.addEventListener('pointerleave',()=>{if(!grandCube?.drag)setCubeHover(null);});
 
 function drawGrandSlot(c, x, y, width, height, room, row, vital, vent, elapsed, assignment) {
-  const source = row < 4 ? channels[row] : null;
-  const ventRow = row - 4;
-  const key = ['pressure_cm_h2o','flow_l_min','volume_ml'][ventRow];
-  const label = row < 4 ? source.label : ['P','Flow','V'][ventRow];
-  const color = row < 4 ? source.color : ['#f0a256','#79e1a0','#65d3e1'][ventRow];
-  const range = row < 4
-    ? (vital?.chartRanges?.[source.key.toLowerCase()] || [source.min,source.max])
-    : (vent ? [vent.pressureRange,vent.flowRange,vent.volumeRange][ventRow] : null);
-  c.fillStyle = row % 2 ? '#10252c' : '#0b1f26'; c.fillRect(x,y,width,height-2);
-  c.font = 'bold 16px system-ui'; c.fillStyle = color; c.fillText(label,x+9,y+20);
-  const plotX=x+91, plotW=width-101;
-  c.strokeStyle='#24464e'; c.lineWidth=1;
-  for(let tick=0;tick<4;tick++) {
-    const gx=plotX+tick*plotW/3;
-    c.beginPath();c.moveTo(gx,y+3);c.lineTo(gx,y+height-5);c.stroke();
-  }
-  let missing=null;
-  if(row<4) {
-    if(!vital) missing=assignment?.telemetry_record?'LOADING':assignment?.patient_id?'NO SOURCE':'UNASSIGNED';
-    else if(!isCached(vital,elapsed)) missing='BUFFERING';
-    else if(!vital.channels[source.key.toLowerCase()]) missing='NO CHANNEL';
-  } else if(!vent || !Array.isArray(vent[key])) missing=assignment?.uc_davis_recording?'LOADING':assignment?.patient_id?'NO SOURCE':'UNASSIGNED';
-  if(missing) {
-    c.fillStyle='#829da4';c.font='14px system-ui';c.fillText(missing,plotX+8,y+30);return;
-  }
-  c.strokeStyle=color;c.lineWidth=1.65;c.beginPath();
-  let started=false,plotted=0;
-  for(let px=0;px<plotW;px+=2) {
-    let value;
-    if(row<4) {
-      const info=vital.channels[source.key.toLowerCase()];
-      const clock=recordClock(vital,elapsed)-vital.windows.length+Math.floor(px*vital.windows.length/plotW);
-      const sample=((clock%vital.samples)+vital.samples)%vital.samples;
-      const digital=decodeWindowSample(sample,info.index,vital.count,vital.parts);
-      if(digital===null) {started=false;continue;}
-      value=(digital-info.baseline)/info.gain;
-    } else {
-      const start=vent.external?0:Math.min(499,Math.floor((elapsed%10)*50));
-      value=vent[key][start+Math.floor(px*249/plotW)];
-    }
-    if(!Number.isFinite(value)) {started=false;continue;}
-    const py=y+height-7-THREE.MathUtils.clamp((value-range[0])/(range[1]-range[0]),0,1)*(height-14);
-    if(started)c.lineTo(plotX+px,py);else c.moveTo(plotX+px,py);
-    started=true;plotted++;
-  }
-  if(plotted)c.stroke();
-  else {c.fillStyle='#829da4';c.font='14px system-ui';c.fillText('NO SAMPLES',plotX+8,y+30);}
+  const channelId=monitorLayouts.unit[row];
+  drawMonitorChannel(c,monitorChannelState(channelId,{vital,vent,assignment},elapsed),
+    {x,y,width,height},{compact:true,index:row});
 }
 
 function drawCubeFace(face, elapsed, now) {

@@ -29,7 +29,7 @@ assert(window.ranges.flow[1]>112.7,'the fixed scale must contain the full source
 const assignment={id:'A-F01-R01',room:1,uc_davis_recording:recording};
 const scene=vm.createContext({roomById:new Map([[assignment.id,assignment]]),
   ucVentByRoom:new Map(),THREE:{MathUtils:{lerp:(a,b,t)=>a+(b-a)*t}},
-  Number,Math});
+  Number,Math,performance:{now:()=>1000}});
 vm.runInContext(sourceOf('scene3d/parts/core.js','updateUcVentWindow'),scene);
 scene.updateUcVentWindow({rooms:[{id:assignment.id,recording,sourceSeconds:5,...window}]});
 const result=scene.ucVentByRoom.get(assignment.id);

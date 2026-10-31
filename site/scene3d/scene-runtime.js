@@ -116,8 +116,11 @@ function updateUcVentWindow(message) {
     const cycle=values=>values.concat(values,values);
     const stable=window.ranges;
     const previousRecord=ucVentByRoom.get(assignment.id);
+    const updatedAt=previousRecord?.sourceSeconds===window.sourceSeconds?
+      previousRecord.updatedAt:performance.now();
     const record={room:assignment.room,recording:window.recording,external:true,
       sourceRate:window.sourceRate,sourceSeconds:window.sourceSeconds,
+      duration:window.duration,paused:window.paused,updatedAt,
       pressure_cm_h2o:cycle(pressure),flow_l_min:cycle(flow),volume_ml:cycle(volume),
       pressureRange:stable?.pressure || previousRecord?.pressureRange || range(pressure,2),
       flowRange:stable?.flow || previousRecord?.flowRange || range(flow,5),
@@ -247,26 +250,143 @@ function loadTrackedModel(path) {
   });
 }
 
+// Source: scene3d/parts/monitor-system.js
+// One channel catalog and one sampler serve every in-scene waveform display.
+// Layouts decide which channels a display exposes; assignments decide sources.
+const monitorChannels = {
+  ecg: {source:'vital', key:'ecg lead ii', label:'ECG II', unit:'mV', color:'#40db91', fallback:[-2,2]},
+  art: {source:'vital', key:'art', label:'ART', unit:'mmHg', color:'#eeac59', fallback:[0,200]},
+  cvp: {source:'vital', key:'cvp', label:'CVP', unit:'mmHg', color:'#5ed7ed', fallback:[-10,30]},
+  pap: {source:'vital', key:'pap', label:'PAP', unit:'mmHg', color:'#e2b4f2', fallback:[0,80]},
+  pressure: {source:'vent', key:'pressure_cm_h2o', label:'P', unit:'cmH₂O', color:'#f0a256', fallback:[0,50]},
+  flow: {source:'vent', key:'flow_l_min', label:'Flow', unit:'L/min', color:'#79e1a0', fallback:[-60,60]},
+  volume: {source:'vent', key:'volume_ml', label:'V calc', unit:'mL', color:'#65d3e1', fallback:[0,800]},
+};
+const monitorLayouts = Object.freeze({
+  ventilator: Object.freeze(['pressure','flow','volume']),
+  telemetry: Object.freeze(['ecg','art','cvp','pap']),
+  unit: Object.freeze(['ecg','art','cvp','pap','pressure','flow','volume']),
+});
+
+function makeMonitorSurface(layout,width,height,materialOptions={}) {
+  if(!monitorLayouts[layout])throw Error(`Unknown monitor layout: ${layout}`);
+  const canvas=document.createElement('canvas');
+  canvas.width=width;canvas.height=height;
+  const texture=new THREE.CanvasTexture(canvas);
+  texture.colorSpace=THREE.SRGBColorSpace;
+  texture.anisotropy=4;
+  const material=new THREE.MeshBasicMaterial({map:texture,side:THREE.DoubleSide,
+    toneMapped:false,depthTest:true,depthWrite:true,...materialOptions});
+  return {layout,canvas,texture,material};
+}
+
+function monitorIntersects(screen,frustum) {
+  if(screen.object && screen.worldBox?.setFromObject){
+    screen.worldBox.setFromObject(screen.object);
+    if(screen.center)screen.worldBox.getCenter(screen.center);
+  }
+  return frustum.intersectsBox(screen.worldBox);
+}
+
+function monitorChannelState(channelId, sources, elapsed) {
+  const channel=monitorChannels[channelId];
+  if(!channel)throw Error(`Unknown monitor channel: ${channelId}`);
+  const record=sources[channel.source], assignment=sources.assignment;
+  const assigned=channel.source==='vital'?assignment?.telemetry_record:assignment?.uc_davis_recording;
+  if(!record)return {channel,range:channel.fallback,status:assigned?'LOADING':assignment?.patient_id?'NO SOURCE':'UNASSIGNED',sample:()=>null};
+  if(channel.source==='vital'){
+    const info=record.channels[channel.key];
+    const range=record.chartRanges?.[channel.key] || channel.fallback;
+    if(!info)return {channel,range,status:'NO CHANNEL',sample:()=>null};
+    if(!isCached(record,elapsed))return {channel,range,status:'BUFFERING',sample:()=>null};
+    const end=recordClock(record,elapsed),start=end-record.windows.length;
+    return {channel,range,status:null,count:record.windows.length,sample:index=>{
+      const clock=start+index,offset=((clock%record.samples)+record.samples)%record.samples;
+      const digital=decodeWindowSample(offset,info.index,record.count,record.parts);
+      return digital===null?null:(digital-info.baseline)/info.gain;
+    }};
+  }
+  const values=record[channel.key];
+  const range=({pressure:record.pressureRange,flow:record.flowRange,volume:record.volumeRange})[channelId] || channel.fallback;
+  if(!Array.isArray(values))return {channel,range,status:'NO SOURCE',sample:()=>null};
+  const start=record.external?0:Math.min(499,Math.floor((elapsed%10)*50));
+  return {channel,range,status:null,count:250,sample:index=>values[start+index]};
+}
+
+function monitorSampleSpan(channelId,sources,fromSeconds,toSeconds,elapsed) {
+  const state=monitorChannelState(channelId,sources,elapsed);
+  if(state.status)return null;
+  const channel=state.channel,record=sources[channel.source];
+  if(channel.source==='vent'){
+    const index=record.external?
+      Math.max(0,Math.min(249,Math.floor(249-(elapsed-toSeconds)*50))):
+      Math.min(499,Math.floor((toSeconds%10)*50));
+    const value=record[channel.key][index];
+    return Number.isFinite(value)?[value,value]:null;
+  }
+  const info=record.channels[channel.key];
+  let low=Infinity,high=-Infinity;
+  for(let clock=recordClock(record,fromSeconds);clock<=recordClock(record,toSeconds);clock++){
+    const sample=((clock%record.samples)+record.samples)%record.samples;
+    const digital=decodeWindowSample(sample,info.index,record.count,record.parts);
+    if(digital===null)continue;
+    const value=(digital-info.baseline)/info.gain;
+    low=Math.min(low,value);high=Math.max(high,value);
+  }
+  return Number.isFinite(low)?[low,high]:null;
+}
+
+function drawMonitorChannel(c, state, box, options={}) {
+  const {x,y,width,height}=box,compact=Boolean(options.compact),plotX=x+(compact?91:140),plotW=width-(compact?101:154);
+  const {channel,range}=state;
+  c.fillStyle=options.index%2?'#10252c':'#0b1f26';c.fillRect(x,y,width,height-2);
+  c.fillStyle=channel.color;c.font=`bold ${compact?16:18}px system-ui`;
+  c.fillText(`${channel.label}${compact?'':` ${channel.unit}`}`,x+9,y+(compact?20:28));
+  if(!compact){c.fillStyle='#89a9af';c.font='12px system-ui';c.fillText(`${range[0].toFixed(0)} to ${range[1].toFixed(0)}`,x+9,y+47);}
+  c.strokeStyle='#24464e';c.lineWidth=1;
+  for(let tick=0;tick<5;tick++){
+    const gx=plotX+tick*plotW/4;c.beginPath();c.moveTo(gx,y+3);c.lineTo(gx,y+height-5);c.stroke();
+  }
+  if(state.status){c.fillStyle='#829da4';c.font='14px system-ui';c.fillText(state.status,plotX+8,y+height/2);return;}
+  const count=state.count,columns=Math.max(1,Math.floor(plotW)),scale=value=>
+    y+height-8-Math.max(0,Math.min(1,(value-range[0])/(range[1]-range[0]||1)))*(height-16);
+  c.strokeStyle=channel.color;c.lineWidth=compact?1.65:2;c.beginPath();
+  let previous=false,plotted=0;
+  for(let pixel=0;pixel<columns;pixel++){
+    const from=Math.floor(pixel*count/columns),to=Math.max(from+1,Math.floor((pixel+1)*count/columns));
+    let low=Infinity,high=-Infinity;
+    for(let index=from;index<to;index++){
+      const value=state.sample(index);
+      if(Number.isFinite(value)){low=Math.min(low,value);high=Math.max(high,value);}
+    }
+    if(!Number.isFinite(low)){previous=false;continue;}
+    const px=plotX+pixel,mid=scale((low+high)/2);
+    if(previous)c.lineTo(px,mid);else c.moveTo(px,mid);
+    previous=true;plotted++;
+    if(high>low){c.moveTo(px,scale(low));c.lineTo(px,scale(high));c.moveTo(px,mid);}
+  }
+  if(plotted)c.stroke();
+  else {c.fillStyle='#829da4';c.font='14px system-ui';c.fillText('NO SAMPLES',plotX+8,y+height/2);}
+}
+
+function drawMonitorLayout(c, layout, sources, elapsed, area, options={}) {
+  const ids=monitorLayouts[layout];
+  if(!ids)throw Error(`Unknown monitor layout: ${layout}`);
+  const rowHeight=area.height/ids.length;
+  ids.forEach((id,index)=>drawMonitorChannel(c,monitorChannelState(id,sources,elapsed),
+    {x:area.x,y:area.y+index*rowHeight,width:area.width,height:rowHeight},
+    {...options,index}));
+}
+
 // Source: scene3d/parts/screens-and-tablet.js
 function makeScreen(room) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 320;
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 4;
-  const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide, toneMapped: false, depthTest: true, depthWrite: true });
-  drawMonitor(canvas, room, null, 0);
-  return { canvas, texture, material };
+  const surface=makeMonitorSurface('telemetry',512,320);
+  drawMonitor(surface.canvas,room,null,0);
+  return surface;
 }
 
 function makeVentScreen() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 640; canvas.height = 400;
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide, toneMapped: false, depthTest: true, depthWrite: true });
-  return { canvas, texture, material };
+  return makeMonitorSurface('ventilator',640,400);
 }
 
 function markUnassigned(screen, roomId, label='UNASSIGNED') {
@@ -294,85 +414,24 @@ function makeFloorBadge(level) {
 }
 
 function drawVentScreen(canvas, record, elapsed, screen) {
-  const c = canvas.getContext('2d');
-  const reset = !screen || !record.external || screen.sweepRecording !== record.recording ||
-    screen.sweepRate !== record.sourceRate ||
-    !Number.isFinite(screen.lastSourceSeconds) || record.sourceSeconds < screen.lastSourceSeconds ||
-    record.sourceSeconds - screen.lastSourceSeconds > 5;
-  if (reset) { c.fillStyle = '#07181e'; c.fillRect(0, 0, 640, 400); }
-  if (!reset && record.sourceSeconds <= screen.lastSourceSeconds) return false;
-  if (reset) {
-  c.fillStyle = '#cce4e7'; c.font = 'bold 19px system-ui';
-  c.fillText(`VENTILATOR · ROOM ${String(record.room).padStart(2, '0')}`, 18, 28);
-  c.fillStyle = '#7fa5aa'; c.font = '12px system-ui';
-  c.fillText(record.external?`UC Davis ${record.sourceRate} Hz source track`:
-    'Recorded pressure + flow · calculated volume · 10 s loop', 18, 46);
-  }
-  const rows = [
-    ['pressure_cm_h2o', 'P cmH₂O', '#f0a256', record.pressureRange],
-    ['flow_l_min', 'Flow L/min', '#79e1a0', record.flowRange],
-    ['volume_ml', 'V calc mL', '#65d3e1', record.volumeRange],
-  ];
-  const start = record.external?0:Math.min(499, Math.floor((elapsed % 10) * 50));
-  const count = record.external && !reset
-    ? Math.min(250, Math.max(1, Math.round((record.sourceSeconds - screen.lastSourceSeconds) * 50))) : 250;
-  const first = record.external ? 250 - count : 0;
-  const plotLeft = 132, plotWidth = 490, plotSamples = 250;
-  if (reset && screen) {
-    screen.sweepStep = 0;
-    screen.sweepPoints = Array(3).fill(null);
-    screen.sweepRecording = record.recording;
-    screen.sweepRate = record.sourceRate;
-  }
-  for (let j = 0; j < 3; j++) {
-    const [key, label, color, range] = rows[j];
-    const y = 65 + j * 107;
-    if (reset) {
-      c.fillStyle = j % 2 ? '#0d232a' : '#0b1e25'; c.fillRect(9, y, 622, 103);
-      c.fillStyle = color; c.font = 'bold 17px system-ui'; c.fillText(label, 18, y + 26);
-      c.fillStyle = '#88aab0'; c.font = '12px system-ui';
-      c.fillText(`${range[0].toFixed(0)} to ${range[1].toFixed(0)}`, 18, y + 46);
-      c.strokeStyle = '#24464d'; c.lineWidth = 1;
-      for (let k = 0; k < 6; k++) {
-        const x = plotLeft + k * 98;
-        c.beginPath(); c.moveTo(x, y + 5); c.lineTo(x, y + 98); c.stroke();
-      }
-    }
-    const values = record[key];
-    if (!Array.isArray(values)) {
-      c.fillStyle = '#8da8ad'; c.fillText('NO SOURCE', 144, y + 55);
-      continue;
-    }
-    c.strokeStyle = color; c.lineWidth = 2;
-    let plotted = 0, previous = screen?.sweepPoints?.[j] || null;
-    for (let i = first; i < 250; i++) {
-      const step = (screen?.sweepStep || 0) + i - first;
-      const column = step % plotSamples;
-      const x = plotLeft + column * plotWidth / (plotSamples - 1);
-      if (record.external) {
-        c.fillStyle = j % 2 ? '#0d232a' : '#0b1e25';
-        c.fillRect(x - 1, y + 5, 3, 93);
-        if (column % 50 === 0) {
-          c.strokeStyle = '#24464d'; c.lineWidth = 1; c.beginPath();
-          c.moveTo(x, y + 5); c.lineTo(x, y + 98); c.stroke();
-          c.strokeStyle = color; c.lineWidth = 2;
-        }
-      }
-      const value = values[start + i];
-      if (!Number.isFinite(value)) { previous = null; continue; }
-      const plotY = y + 93 - Math.max(0,Math.min(1,(value - range[0]) / (range[1] - range[0] || 1))) * 83;
-      c.beginPath();
-      if (previous && column > 0 && previous.step === step - 1) c.moveTo(previous.x, previous.y);
-      else c.moveTo(x, plotY);
-      c.lineTo(x, plotY); c.stroke();
-      previous = {step,x,y:plotY}; plotted++;
-    }
-    if (screen) screen.sweepPoints[j] = previous;
-    if (!plotted && reset) { c.fillStyle = '#8da8ad'; c.fillText('NO SAMPLES', 144, y + 55); }
-  }
-  if (screen && record.external) {
-    screen.sweepStep += count;
-    screen.lastSourceSeconds = record.sourceSeconds;
+  if (!record) return false;
+  const c=canvas.getContext('2d');
+  c.fillStyle='#07181e';c.fillRect(0,0,640,400);
+  c.fillStyle='#cce4e7';c.font='bold 19px system-ui';
+  c.fillText(`VENTILATOR · ROOM ${String(record.room).padStart(2,'0')}`,18,28);
+  c.fillStyle='#7fa5aa';c.font='12px system-ui';
+  const feedStatus=record.paused?' · paused':
+    Number.isFinite(record.duration)&&record.sourceSeconds>=record.duration?' · complete · replay to restart':
+    Number.isFinite(record.updatedAt)&&performance.now()-record.updatedAt>1500?' · waiting for data':'';
+  c.fillText(record.external?`UC Davis ${record.sourceRate} Hz source track${feedStatus}`:
+    'Recorded pressure + flow · calculated volume',18,46);
+  const assignment=roomAssignment(activeHospital,activeFloor,record.room);
+  drawMonitorLayout(c,'ventilator',{vent:record,assignment},elapsed,
+    {x:9,y:65,width:622,height:321});
+  if(screen){
+    screen.lastSourceSeconds=record.sourceSeconds;
+    screen.sweepRecording=record.recording;
+    screen.sweepRate=record.sourceRate;
   }
   return true;
 }
@@ -382,7 +441,7 @@ function drawVentilatorsFrame(elapsed, frustum) {
   if (!floors[activeFloor - 1]) return;
   const screens = floors[activeFloor - 1].ventScreens;
   screens.forEach((screen, i) => {
-    if (!frustum.intersectsBox(screen.worldBox)) return;
+    if (!monitorIntersects(screen,frustum)) return;
     const record = ventRecordForRoom(i + 1);
     if(!record)return;
     if (!drawVentScreen(screen.canvas, record, elapsed, screen)) return;
@@ -451,13 +510,12 @@ function drawTablet(elapsed) {
     c.fillText(assignment?.telemetry_record?'VITAL SIGNS · complete MGH recording':assignment?.patient_id?'VITAL SIGNS · NO SOURCE':'VITAL SIGNS · UNASSIGNED', 22, 58);
     c.fillText(assignment?.uc_davis_recording?'VENTILATOR · UC Davis full source visual track':assignment?.patient_id?'VENTILATOR · NO SOURCE':'VENTILATOR · UNASSIGNED', 510, 58);
     for (let row = 0; row < 7; row++) {
-      const y = 75 + row * rowH, channel = channels[row];
-      const range = row < 4
-        ? (vital?.chartRanges?.[channel.key.toLowerCase()] || [channel.min, channel.max])
-        : (vent ? [vent.pressureRange, vent.flowRange, vent.volumeRange][row - 4] : [0, 1]);
+      const y = 75 + row * rowH, channel = monitorChannels[monitorLayouts.unit[row]];
+      const channelState=monitorChannelState(monitorLayouts.unit[row],{vital,vent,assignment},elapsed);
+      const range=channelState.range;
       tablet.ranges.push(range);
-      const color = row < 4 ? channel.color : ['#f0a256', '#79e1a0', '#65d3e1'][row - 4];
-      const label = row < 4 ? `${channel.label}  ${channel.unit}` : ['P  cmH₂O', 'Flow  L/min', 'V  calc mL'][row - 4];
+      const color = channel.color;
+      const label = `${channel.label}  ${channel.unit}`;
       c.fillStyle = row % 2 ? '#10252c' : '#0d2027'; c.fillRect(12, y, 1000, rowH - 3);
       c.strokeStyle = '#28505a'; c.lineWidth = 1;
       for (let tick = 0; tick < 5; tick++) {
@@ -466,14 +524,10 @@ function drawTablet(elapsed) {
       }
       c.fillStyle = color; c.font = 'bold 20px system-ui'; c.fillText(label, 23, y + 32);
       c.fillStyle = '#89a9af'; c.font = '15px system-ui'; c.fillText(`${range[0].toFixed(0)} to ${range[1].toFixed(0)}`, 23, y + 58);
-      const available = row < 4 ? Boolean(vital?.parts && vital.channels[channel.key.toLowerCase()])
-        : Boolean(vent && Array.isArray(vent[['pressure_cm_h2o', 'flow_l_min', 'volume_ml'][row - 4]]));
+      const available=!channelState.status;
       if (!available) {
         c.fillStyle = '#79939b';
-        const message = row < 4
-          ? (!assignment?.telemetry_record ? assignment?.patient_id?'NO SOURCE':'UNASSIGNED' : vital?.parts?'No source channel':'Loading source waveform…')
-          : (assignment?.uc_davis_recording?'LOADING':assignment?.patient_id?'NO SOURCE':'UNASSIGNED');
-        c.fillText(message, chartX + 12, y + 52);
+        c.fillText(channelState.status, chartX + 12, y + 52);
       }
     }
     c.fillStyle = '#96bbc2'; c.font = '15px system-ui';
@@ -486,8 +540,8 @@ function drawTablet(elapsed) {
   for (let step = tablet.lastStep + 1; step <= currentStep; step++) {
     const x = step % chartW, t = tablet.sweepStart + step / stepRate;
     for (let row = 0; row < 7; row++) {
-      const y = 75 + row * rowH, channel = channels[row];
-      const key = row < 4 ? channel.key.toLowerCase() : ['pressure_cm_h2o', 'flow_l_min', 'volume_ml'][row - 4];
+      const y = 75 + row * rowH, channel = monitorChannels[monitorLayouts.unit[row]];
+      const key = channel.key;
       const available = row < 4 ? Boolean(vital?.parts && vital.channels[key]) : Boolean(vent && Array.isArray(vent[key]));
       if (!available) continue;
       c.fillStyle = row % 2 ? '#10252c' : '#0d2027';
@@ -496,28 +550,13 @@ function drawTablet(elapsed) {
         c.strokeStyle = '#28505a'; c.lineWidth = 1;
         c.beginPath(); c.moveTo(chartX + x, y + 4); c.lineTo(chartX + x, y + rowH - 8); c.stroke();
       }
-      let lo = Infinity, hi = -Infinity;
-      if (row < 4) {
-        const info = vital.channels[key];
-        const from = recordClock(vital, t - 1 / stepRate), to = recordClock(vital, t);
-        for (let clock = from; clock <= to; clock++) {
-          const sample = ((clock % vital.samples) + vital.samples) % vital.samples;
-          const digital = decodeWindowSample(sample, info.index, vital.count, vital.parts);
-          if (digital === null) continue;
-          const value = (digital - info.baseline) / info.gain;
-          lo = Math.min(lo, value); hi = Math.max(hi, value);
-        }
-      } else {
-        const index = vent.external
-          ? Math.max(0, Math.min(249, Math.floor(249 - (elapsed - t) * 50)))
-          : Math.min(499, Math.floor((t % 10) * 50));
-        lo = hi = vent[key][index];
-      }
-      if (!Number.isFinite(lo)) { tablet.lastPoints[row] = null; continue; }
+      const span=monitorSampleSpan(monitorLayouts.unit[row],{vital,vent,assignment},t-1/stepRate,t,elapsed);
+      if (!span) { tablet.lastPoints[row] = null; continue; }
+      const [lo,hi]=span;
       const [min, max] = tablet.ranges[row];
       const plot = value => y + rowH - 12 - THREE.MathUtils.clamp((value - min) / (max - min || 1), 0, 1) * (rowH - 24);
       const py = plot((lo + hi) / 2);
-      c.strokeStyle = row < 4 ? channel.color : ['#f0a256', '#79e1a0', '#65d3e1'][row - 4];
+      c.strokeStyle = channel.color;
       c.lineWidth = 2; c.beginPath();
       const previous = tablet.lastPoints[row];
       if (previous && previous.step === step - 1 && x > 0) c.moveTo(chartX + x - 1, previous.py);
@@ -553,11 +592,8 @@ function makeGrandCube(hospitalId) {
     {floor:6,position:[0,-half,0],rotation:[Math.PI/2,0,Math.PI]},
   ];
   const faces = definitions.map(({floor,position,rotation}) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = 1280;
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    const material = new THREE.MeshBasicMaterial({map:texture,toneMapped:false,depthTest:true,depthWrite:true});
+    const {canvas,texture,material}=makeMonitorSurface('unit',1280,1280,
+      {side:THREE.FrontSide});
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(surface,surface),material);
     mesh.name = `Nursing cube · floor ${floor}`;
     mesh.position.set(...position);
@@ -749,53 +785,9 @@ renderer.domElement.addEventListener('pointercancel',event=>{
 renderer.domElement.addEventListener('pointerleave',()=>{if(!grandCube?.drag)setCubeHover(null);});
 
 function drawGrandSlot(c, x, y, width, height, room, row, vital, vent, elapsed, assignment) {
-  const source = row < 4 ? channels[row] : null;
-  const ventRow = row - 4;
-  const key = ['pressure_cm_h2o','flow_l_min','volume_ml'][ventRow];
-  const label = row < 4 ? source.label : ['P','Flow','V'][ventRow];
-  const color = row < 4 ? source.color : ['#f0a256','#79e1a0','#65d3e1'][ventRow];
-  const range = row < 4
-    ? (vital?.chartRanges?.[source.key.toLowerCase()] || [source.min,source.max])
-    : (vent ? [vent.pressureRange,vent.flowRange,vent.volumeRange][ventRow] : null);
-  c.fillStyle = row % 2 ? '#10252c' : '#0b1f26'; c.fillRect(x,y,width,height-2);
-  c.font = 'bold 16px system-ui'; c.fillStyle = color; c.fillText(label,x+9,y+20);
-  const plotX=x+91, plotW=width-101;
-  c.strokeStyle='#24464e'; c.lineWidth=1;
-  for(let tick=0;tick<4;tick++) {
-    const gx=plotX+tick*plotW/3;
-    c.beginPath();c.moveTo(gx,y+3);c.lineTo(gx,y+height-5);c.stroke();
-  }
-  let missing=null;
-  if(row<4) {
-    if(!vital) missing=assignment?.telemetry_record?'LOADING':assignment?.patient_id?'NO SOURCE':'UNASSIGNED';
-    else if(!isCached(vital,elapsed)) missing='BUFFERING';
-    else if(!vital.channels[source.key.toLowerCase()]) missing='NO CHANNEL';
-  } else if(!vent || !Array.isArray(vent[key])) missing=assignment?.uc_davis_recording?'LOADING':assignment?.patient_id?'NO SOURCE':'UNASSIGNED';
-  if(missing) {
-    c.fillStyle='#829da4';c.font='14px system-ui';c.fillText(missing,plotX+8,y+30);return;
-  }
-  c.strokeStyle=color;c.lineWidth=1.65;c.beginPath();
-  let started=false,plotted=0;
-  for(let px=0;px<plotW;px+=2) {
-    let value;
-    if(row<4) {
-      const info=vital.channels[source.key.toLowerCase()];
-      const clock=recordClock(vital,elapsed)-vital.windows.length+Math.floor(px*vital.windows.length/plotW);
-      const sample=((clock%vital.samples)+vital.samples)%vital.samples;
-      const digital=decodeWindowSample(sample,info.index,vital.count,vital.parts);
-      if(digital===null) {started=false;continue;}
-      value=(digital-info.baseline)/info.gain;
-    } else {
-      const start=vent.external?0:Math.min(499,Math.floor((elapsed%10)*50));
-      value=vent[key][start+Math.floor(px*249/plotW)];
-    }
-    if(!Number.isFinite(value)) {started=false;continue;}
-    const py=y+height-7-THREE.MathUtils.clamp((value-range[0])/(range[1]-range[0]),0,1)*(height-14);
-    if(started)c.lineTo(plotX+px,py);else c.moveTo(plotX+px,py);
-    started=true;plotted++;
-  }
-  if(plotted)c.stroke();
-  else {c.fillStyle='#829da4';c.font='14px system-ui';c.fillText('NO SAMPLES',plotX+8,y+30);}
+  const channelId=monitorLayouts.unit[row];
+  drawMonitorChannel(c,monitorChannelState(channelId,{vital,vent,assignment},elapsed),
+    {x,y,width,height},{compact:true,index:row});
 }
 
 function drawCubeFace(face, elapsed, now) {
@@ -949,69 +941,9 @@ function drawMonitor(canvas, room, record, elapsed) {
   c.fillText(`ROOM ${String(room).padStart(2, '0')}  •  ${record?.id?.toUpperCase() || 'LOADING'}`, 24, 37);
   c.font = '17px system-ui'; c.fillStyle = '#789ba5';
   c.fillText(record ? `${Math.floor((elapsed + record.startSeconds) % record.duration)} s / ${Math.floor(record.duration)} s · full recording loops` : 'Loading source waveform…', 24, 64);
-  const plotX = 150, plotW = 630, rowH = 97;
-  for (let j = 0; j < channels.length; j++) {
-    const ch = channels[j], y = 83 + j * rowH;
-    c.fillStyle = j % 2 ? '#10242a' : '#0d2026'; c.fillRect(12, y, 776, rowH - 3);
-    c.strokeStyle = '#28505a'; c.lineWidth = 1;
-    for (let k = 0; k < 5; k++) {
-      const gx = plotX + k * plotW / 4;
-      c.beginPath(); c.moveTo(gx, y); c.lineTo(gx, y + rowH - 3); c.stroke();
-    }
-    c.fillStyle = ch.color; c.font = 'bold 20px system-ui'; c.fillText(ch.label, 22, y + 34);
-    c.fillStyle = '#90adb4'; c.font = '15px system-ui'; c.fillText(ch.unit, 23, y + 58);
-    if (!record?.windows || !record.channels[ch.key.toLowerCase()]) {
-      c.fillStyle = '#5e7880'; c.fillText(record ? 'No source channel' : '…', plotX + 9, y + 68);
-      continue;
-    }
-    const samples = record.windows, info = record.channels[ch.key.toLowerCase()];
-    const [chartMin, chartMax] = record.chartRanges?.[ch.key.toLowerCase()] || [ch.min, ch.max];
-    if (j > 0) {
-      c.fillStyle = '#91aeb6'; c.font = '13px system-ui';
-      c.fillText(`${chartMin.toFixed(0)} to ${chartMax.toFixed(0)}`, 22, y + 84);
-    }
-    c.strokeStyle = ch.color; c.lineWidth = 2.2; c.beginPath();
-    let started = false, plotted = 0;
-    for (let x = 0; x < plotW; x++) {
-      const a = Math.floor(x * samples.length / plotW);
-      const b = Math.min(samples.length, Math.floor((x + 1) * samples.length / plotW));
-      let lo = Infinity, hi = -Infinity;
-      for (let s = a; s < b; s++) {
-        const v = decodeWindowSample(samples[s], info.index, record.count, record.parts);
-        if (v === null) continue;
-        const physical = (v - info.baseline) / info.gain;
-        lo = Math.min(lo, physical); hi = Math.max(hi, physical);
-      }
-      if (!Number.isFinite(lo)) { started = false; continue; }
-      const py = y + rowH - 12 - (Math.max(chartMin, Math.min(chartMax, (lo + hi) / 2)) - chartMin) / (chartMax - chartMin) * (rowH - 25);
-      if (!started) { c.moveTo(plotX + x, py); started = true; }
-      else c.lineTo(plotX + x, py);
-      plotted++;
-    }
-    if (!plotted) {
-      c.fillStyle = '#5e7880'; c.fillText('NO SAMPLES', plotX + 9, y + 68);
-      continue;
-    }
-    c.stroke();
-    c.globalAlpha = 0.42; c.lineWidth = 1;
-    for (let x = 0; x < plotW; x++) {
-      const a = Math.floor(x * samples.length / plotW);
-      const b = Math.min(samples.length, Math.floor((x + 1) * samples.length / plotW));
-      let lo = Infinity, hi = -Infinity;
-      for (let s = a; s < b; s++) {
-        const v = decodeWindowSample(samples[s], info.index, record.count, record.parts);
-        if (v === null) continue;
-        const physical = (v - info.baseline) / info.gain;
-        lo = Math.min(lo, physical); hi = Math.max(hi, physical);
-      }
-      if (Number.isFinite(lo)) {
-        const y1 = y + rowH - 12 - (Math.max(chartMin, Math.min(chartMax, hi)) - chartMin) / (chartMax - chartMin) * (rowH - 25);
-        const y2 = y + rowH - 12 - (Math.max(chartMin, Math.min(chartMax, lo)) - chartMin) / (chartMax - chartMin) * (rowH - 25);
-        c.beginPath(); c.moveTo(plotX + x, y1); c.lineTo(plotX + x, y2); c.stroke();
-      }
-    }
-    c.globalAlpha = 1;
-  }
+  drawMonitorLayout(c,'telemetry',
+    {vital:record,assignment:roomAssignment(activeHospital,activeFloor,room)},elapsed,
+    {x:12,y:83,width:776,height:388});
 }
 
 // Source: scene3d/parts/telemetry.js
@@ -1137,21 +1069,18 @@ function drawTelemetryFrame(now, elapsed, frustum) {
   if (records.some(record => record && !isCached(record, elapsed))) ensureTelemetryCaches();
   if(!records.some(Boolean))return;
   const screens = floors[floor - 1].screens;
+  const intersects=screens.map(screen=>monitorIntersects(screen,frustum));
   const nearest = Math.min(...screens.map(s => camera.position.distanceTo(s.center)));
   const visible = [];
   for (let i = 0; i < 6; i++) {
     const screen = screens[i];
-    if (frustum.intersectsBox(screen.worldBox) && (nearest >= 6 || camera.position.distanceTo(screen.center) < 10)) visible.push(i);
+    if (intersects[i] && (nearest >= 6 || camera.position.distanceTo(screen.center) < 10)) visible.push(i);
   }
   // Screens visible in the same camera view receive the same timestamp. A
   // hidden screen catches up on its next visible frame.
   for (const i of visible) {
     const record = records[i];
-    if(!record || !isCached(record, elapsed))continue;
-    const start = recordClock(record, elapsed) - record.windows.length;
-    for (let j = 0; j < record.windows.length; j++) {
-      record.windows[j] = ((start + j) % record.samples + record.samples) % record.samples;
-    }
+    if(!record)continue;
     const screen = screens[i];
     const width = nearest >= 6 ? 256 : 512;
     if (screen.canvas.width !== width) {

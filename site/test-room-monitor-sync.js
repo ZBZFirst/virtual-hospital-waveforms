@@ -17,6 +17,7 @@ const ventContext = vm.createContext({
   hospitalView: false, expandedHospital: false, activeFloor: 1,
   ventRecords: [], floors: [{ ventScreens }],
   frustum: { intersectsBox: () => true },
+  monitorIntersects: () => true,
   ventRecordForRoom: room => room === 3 ? { room } : null,
   drawVentScreen: (_canvas, record) => ventDraws.push(record.room),
 });
@@ -38,6 +39,7 @@ const telemetryContext = vm.createContext({
   floors: [{ screens: telemetryScreens }],
   camera: { position: { distanceTo: () => 1 } },
   frustum: { intersectsBox: () => true },
+  monitorIntersects: () => true,
   isCached: record => record.ready,
   ensureTelemetryCaches: () => { cacheRequests++; },
   recordClock: () => 10,
@@ -46,8 +48,8 @@ const telemetryContext = vm.createContext({
 });
 vm.runInContext(functionSource('scene3d/parts/telemetry.js', 'drawTelemetryFrame'), telemetryContext);
 vm.runInContext('drawTelemetryFrame(1000, 5, frustum)', telemetryContext);
-assert.deepEqual(telemetryDraws, [1], 'ready telemetry screen should draw while another room is uncached');
+assert.deepEqual(telemetryDraws, [1, 2], 'ready room draws while the uncached room shows buffering');
 assert.equal(cacheRequests, 1);
 assert.equal(telemetryScreens[0].texture.needsUpdate, true);
-assert.notEqual(telemetryScreens[1].texture.needsUpdate, true);
+assert.equal(telemetryScreens[1].texture.needsUpdate, true);
 console.log('Room screens draw available sources independently');

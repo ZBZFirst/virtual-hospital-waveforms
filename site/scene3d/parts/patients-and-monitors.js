@@ -105,67 +105,7 @@ function drawMonitor(canvas, room, record, elapsed) {
   c.fillText(`ROOM ${String(room).padStart(2, '0')}  •  ${record?.id?.toUpperCase() || 'LOADING'}`, 24, 37);
   c.font = '17px system-ui'; c.fillStyle = '#789ba5';
   c.fillText(record ? `${Math.floor((elapsed + record.startSeconds) % record.duration)} s / ${Math.floor(record.duration)} s · full recording loops` : 'Loading source waveform…', 24, 64);
-  const plotX = 150, plotW = 630, rowH = 97;
-  for (let j = 0; j < channels.length; j++) {
-    const ch = channels[j], y = 83 + j * rowH;
-    c.fillStyle = j % 2 ? '#10242a' : '#0d2026'; c.fillRect(12, y, 776, rowH - 3);
-    c.strokeStyle = '#28505a'; c.lineWidth = 1;
-    for (let k = 0; k < 5; k++) {
-      const gx = plotX + k * plotW / 4;
-      c.beginPath(); c.moveTo(gx, y); c.lineTo(gx, y + rowH - 3); c.stroke();
-    }
-    c.fillStyle = ch.color; c.font = 'bold 20px system-ui'; c.fillText(ch.label, 22, y + 34);
-    c.fillStyle = '#90adb4'; c.font = '15px system-ui'; c.fillText(ch.unit, 23, y + 58);
-    if (!record?.windows || !record.channels[ch.key.toLowerCase()]) {
-      c.fillStyle = '#5e7880'; c.fillText(record ? 'No source channel' : '…', plotX + 9, y + 68);
-      continue;
-    }
-    const samples = record.windows, info = record.channels[ch.key.toLowerCase()];
-    const [chartMin, chartMax] = record.chartRanges?.[ch.key.toLowerCase()] || [ch.min, ch.max];
-    if (j > 0) {
-      c.fillStyle = '#91aeb6'; c.font = '13px system-ui';
-      c.fillText(`${chartMin.toFixed(0)} to ${chartMax.toFixed(0)}`, 22, y + 84);
-    }
-    c.strokeStyle = ch.color; c.lineWidth = 2.2; c.beginPath();
-    let started = false, plotted = 0;
-    for (let x = 0; x < plotW; x++) {
-      const a = Math.floor(x * samples.length / plotW);
-      const b = Math.min(samples.length, Math.floor((x + 1) * samples.length / plotW));
-      let lo = Infinity, hi = -Infinity;
-      for (let s = a; s < b; s++) {
-        const v = decodeWindowSample(samples[s], info.index, record.count, record.parts);
-        if (v === null) continue;
-        const physical = (v - info.baseline) / info.gain;
-        lo = Math.min(lo, physical); hi = Math.max(hi, physical);
-      }
-      if (!Number.isFinite(lo)) { started = false; continue; }
-      const py = y + rowH - 12 - (Math.max(chartMin, Math.min(chartMax, (lo + hi) / 2)) - chartMin) / (chartMax - chartMin) * (rowH - 25);
-      if (!started) { c.moveTo(plotX + x, py); started = true; }
-      else c.lineTo(plotX + x, py);
-      plotted++;
-    }
-    if (!plotted) {
-      c.fillStyle = '#5e7880'; c.fillText('NO SAMPLES', plotX + 9, y + 68);
-      continue;
-    }
-    c.stroke();
-    c.globalAlpha = 0.42; c.lineWidth = 1;
-    for (let x = 0; x < plotW; x++) {
-      const a = Math.floor(x * samples.length / plotW);
-      const b = Math.min(samples.length, Math.floor((x + 1) * samples.length / plotW));
-      let lo = Infinity, hi = -Infinity;
-      for (let s = a; s < b; s++) {
-        const v = decodeWindowSample(samples[s], info.index, record.count, record.parts);
-        if (v === null) continue;
-        const physical = (v - info.baseline) / info.gain;
-        lo = Math.min(lo, physical); hi = Math.max(hi, physical);
-      }
-      if (Number.isFinite(lo)) {
-        const y1 = y + rowH - 12 - (Math.max(chartMin, Math.min(chartMax, hi)) - chartMin) / (chartMax - chartMin) * (rowH - 25);
-        const y2 = y + rowH - 12 - (Math.max(chartMin, Math.min(chartMax, lo)) - chartMin) / (chartMax - chartMin) * (rowH - 25);
-        c.beginPath(); c.moveTo(plotX + x, y1); c.lineTo(plotX + x, y2); c.stroke();
-      }
-    }
-    c.globalAlpha = 1;
-  }
+  drawMonitorLayout(c,'telemetry',
+    {vital:record,assignment:roomAssignment(activeHospital,activeFloor,room)},elapsed,
+    {x:12,y:83,width:776,height:388});
 }

@@ -120,21 +120,18 @@ function drawTelemetryFrame(now, elapsed, frustum) {
   if (records.some(record => record && !isCached(record, elapsed))) ensureTelemetryCaches();
   if(!records.some(Boolean))return;
   const screens = floors[floor - 1].screens;
+  const intersects=screens.map(screen=>monitorIntersects(screen,frustum));
   const nearest = Math.min(...screens.map(s => camera.position.distanceTo(s.center)));
   const visible = [];
   for (let i = 0; i < 6; i++) {
     const screen = screens[i];
-    if (frustum.intersectsBox(screen.worldBox) && (nearest >= 6 || camera.position.distanceTo(screen.center) < 10)) visible.push(i);
+    if (intersects[i] && (nearest >= 6 || camera.position.distanceTo(screen.center) < 10)) visible.push(i);
   }
   // Screens visible in the same camera view receive the same timestamp. A
   // hidden screen catches up on its next visible frame.
   for (const i of visible) {
     const record = records[i];
-    if(!record || !isCached(record, elapsed))continue;
-    const start = recordClock(record, elapsed) - record.windows.length;
-    for (let j = 0; j < record.windows.length; j++) {
-      record.windows[j] = ((start + j) % record.samples + record.samples) % record.samples;
-    }
+    if(!record)continue;
     const screen = screens[i];
     const width = nearest >= 6 ? 256 : 512;
     if (screen.canvas.width !== width) {

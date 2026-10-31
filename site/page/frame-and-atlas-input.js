@@ -127,7 +127,8 @@ function frame(now) {
         const duration=entry.samples/RATE;
         const end=Math.min(feedClock(entry),duration);
         const window=sceneWindow(entry,end);
-        if(window)rooms.push({id:assignment.id,recording:entry.name,sourceSeconds:end,...window});
+        if(window)rooms.push({id:assignment.id,recording:entry.name,sourceSeconds:end,
+          duration,paused:feedPaused(entry),...window});
       }
       }
       if(rooms.length)scene.postMessage({type:'zebezo-ward-windows',rooms},location.origin);

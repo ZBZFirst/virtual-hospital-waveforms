@@ -15,9 +15,9 @@ const tablet = {
   canvas: { width: 1024, height: 768, getContext: () => context2d },
   texture: { needsUpdate: false }, drawCount: 0,
 };
-const channels = ['ecg ii', 'art', 'cvp', 'pap'].map(key => ({ key, label: key, unit: 'mV', min: -2, max: 2, color: '#fff' }));
+const channels = ['ecg lead ii', 'art', 'cvp', 'pap'].map(key => ({ key, label: key, unit: 'mV', min: -2, max: 2, color: '#fff' }));
 const record = {
-  id: 'mgh001', parts: {}, samples: 10000, fs: 100, count: 4,
+  id: 'mgh001', parts: {}, samples: 10000, fs: 100, count: 4, windows: new Int32Array(800),
   channels: Object.fromEntries(channels.map((channel, index) => [channel.key, { index, baseline: 0, gain: 100 }])),
 };
 const rooms = [{ id: 'A-F01-R01', patient_id: 'SIM-A-F01-R01', telemetry_record: 'mgh001' },
@@ -33,6 +33,7 @@ const context = {
   THREE: { MathUtils: { clamp: (value, low, high) => Math.max(low, Math.min(high, value)) } },
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync('scene3d/parts/monitor-system.js','utf8'),context);
 vm.runInContext(source.slice(source.indexOf('function drawTablet(')), context);
 const fullClears = () => fills.filter(([x, y, width, height]) => x === 0 && y === 0 && width === 1024 && height === 768).length;
 

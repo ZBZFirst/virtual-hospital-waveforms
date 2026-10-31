@@ -113,8 +113,11 @@ function updateUcVentWindow(message) {
     const cycle=values=>values.concat(values,values);
     const stable=window.ranges;
     const previousRecord=ucVentByRoom.get(assignment.id);
+    const updatedAt=previousRecord?.sourceSeconds===window.sourceSeconds?
+      previousRecord.updatedAt:performance.now();
     const record={room:assignment.room,recording:window.recording,external:true,
       sourceRate:window.sourceRate,sourceSeconds:window.sourceSeconds,
+      duration:window.duration,paused:window.paused,updatedAt,
       pressure_cm_h2o:cycle(pressure),flow_l_min:cycle(flow),volume_ml:cycle(volume),
       pressureRange:stable?.pressure || previousRecord?.pressureRange || range(pressure,2),
       flowRange:stable?.flow || previousRecord?.flowRange || range(flow,5),
