@@ -1,5 +1,34 @@
+function enablePanelDrag(panel,header){
+  let drag=null;
+  function clamp(left,top){
+    panel.style.left=`${Math.max(0,Math.min(innerWidth-panel.offsetWidth,left))}px`;
+    panel.style.top=`${Math.max(0,Math.min(innerHeight-panel.offsetHeight,top))}px`;
+    panel.style.right='auto';
+    panel.style.bottom='auto';
+  }
+  header.addEventListener('pointerdown',event=>{
+    if(event.button!==0||event.target.closest('button'))return;
+    const rect=panel.getBoundingClientRect();
+    drag={id:event.pointerId,x:event.clientX,y:event.clientY,left:rect.left,top:rect.top};
+    clamp(rect.left,rect.top);
+    header.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+  header.addEventListener('pointermove',event=>{
+    if(drag?.id===event.pointerId)clamp(drag.left+event.clientX-drag.x,drag.top+event.clientY-drag.y);
+  });
+  for(const type of ['pointerup','pointercancel'])header.addEventListener(type,event=>{
+    if(drag?.id===event.pointerId)drag=null;
+  });
+  addEventListener('resize',()=>{
+    if(panel.style.left)clamp(parseFloat(panel.style.left),parseFloat(panel.style.top));
+  });
+  return {clamp};
+}
+
 function setupToolbarTabsAndDrag(){
   const bar=document.querySelector('#bar'),header=document.querySelector('#barHeader');
+  const barDrag=enablePanelDrag(bar,header);
   const tabs=[...document.querySelectorAll('.toolbar-tab')];
   function selectTab(tab){
     closeToolbarPickers();
@@ -8,7 +37,7 @@ function setupToolbarTabsAndDrag(){
       item.setAttribute('aria-selected',String(active));item.tabIndex=active?0:-1;
       document.getElementById(item.getAttribute('aria-controls')).hidden=!active;
     }
-    if(bar.style.left)clampBar(parseFloat(bar.style.left),parseFloat(bar.style.top));
+    if(bar.style.left)barDrag.clamp(parseFloat(bar.style.left),parseFloat(bar.style.top));
   }
   for(const tab of tabs){
     tab.addEventListener('click',()=>selectTab(tab));
@@ -23,29 +52,9 @@ function setupToolbarTabsAndDrag(){
     });
   }
   selectTab(tabs[0]);
-  let drag=null;
-  function clampBar(left,top){
-    bar.style.left=`${Math.max(0,Math.min(innerWidth-bar.offsetWidth,left))}px`;
-    bar.style.top=`${Math.max(0,Math.min(innerHeight-bar.offsetHeight,top))}px`;
-    bar.style.right='auto';
-  }
-  header.addEventListener('pointerdown',event=>{
-    if(event.button!==0||event.target.closest('button'))return;
-    const rect=bar.getBoundingClientRect();
-    drag={id:event.pointerId,x:event.clientX,y:event.clientY,left:rect.left,top:rect.top};
-    clampBar(rect.left,rect.top);header.setPointerCapture(event.pointerId);
-  });
-  header.addEventListener('pointermove',event=>{
-    if(drag?.id===event.pointerId)clampBar(drag.left+event.clientX-drag.x,drag.top+event.clientY-drag.y);
-  });
-  for(const type of ['pointerup','pointercancel'])header.addEventListener(type,event=>{
-    if(drag?.id===event.pointerId)drag=null;
-  });
-  addEventListener('resize',()=>{
-    if(bar.style.left)clampBar(parseFloat(bar.style.left),parseFloat(bar.style.top));
-  });
 }
 setupToolbarTabsAndDrag();
+enablePanelDrag(document.querySelector('#cubeInspector'),document.querySelector('#cubeDragHandle'));
 document.querySelector('#walk').addEventListener('click', () => walkMode ? stopWalk() : startWalk());
 document.querySelector('#inspectTarget').addEventListener('click', () => {
   if(walkMode){tabletInspect=!tabletInspect;placeTablet();}

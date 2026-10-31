@@ -74,6 +74,10 @@ async function boot() {
 window.addEventListener('message',event=>{
   if(!embedded || event.origin!==location.origin || event.source!==parent)return;
   if(event.data?.type==='zebezo-ward-windows'){updateUcVentWindow(event.data);return;}
+  if(event.data?.type==='zebezo-scene-layout'){
+    document.documentElement.classList.toggle('streamer-layout',event.data.streamer===true);
+    return;
+  }
   if(event.data?.type!=='zebezo-scene-action')return;
   const action=event.data.action;
   if(action==='status'){

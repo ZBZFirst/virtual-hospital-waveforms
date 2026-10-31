@@ -1985,6 +1985,9 @@ function loadBreathSequences(){
 }
 function setupStreamerMode(){
   const panel=$('streamerWindow'),toggle=$('streamerToggle'),retry=$('streamerRetry');
+  const sceneFrame=$('hospitalScene');
+  const syncSceneLayout=()=>sceneFrame.contentWindow?.postMessage({type:'zebezo-scene-layout',streamer:document.body.classList.contains('streamer-mode')},location.origin);
+  sceneFrame.addEventListener('load',syncSceneLayout);
   const handle=$('streamerDragHandle'),stage=$('captureStage'),layout=$('streamerLayout');
   const clean=$('streamerClean'),restore=$('streamerRestore'),feed=$('streamerOutput');
   const horizontal=$('streamerHorizontal'),portrait=$('streamerPortrait'),theme=$('streamerTheme');
@@ -2029,11 +2032,13 @@ function setupStreamerMode(){
   function close(){
     window.StreamerMask.stop();window.StreamerMask.hideEditor();panel.hidden=true;retry.hidden=true;
     setClean(false);layout.hidden=true;document.body.classList.remove('streamer-mode');
+    syncSceneLayout();
     toggle.textContent='Streamer mode';toggle.setAttribute('aria-pressed','false');
   }
   async function open(){
     if(!panel.hidden)return;
     document.body.classList.add('streamer-mode');layout.hidden=false;
+    syncSceneLayout();
     syncTheme();
     panel.hidden=false;toggle.textContent='Stop streamer mode';toggle.setAttribute('aria-pressed','true');
     requestAnimationFrame(clampCameraWindow);
