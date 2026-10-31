@@ -2614,7 +2614,16 @@ animate();
 let sharedPatientAssets = null;
 let simulationSignTexture = null;
 function isStaticWaveformMeshName(name) {
-  return /(?:_trace$|_rolling_(?:pressure|flow|calculated_volume)$|\brolling (?:pressure|flow|calculated volume)\b|\bventilator screen trace\b)/i.test(name);
+  // GLTFLoader replaces spaces and punctuation in Object3D.name. Match the
+  // exported name and its runtime form so neither can leave baked traces live.
+  const words=name.replace(/[_|]+/g,' ').replace(/\s+/g,' ').trim().toLowerCase();
+  return /\brolling (?:pressure|flow|calculated volume)\b|\bventilator screen trace\b|\bcurrent sample edge\b|\btrace$/.test(words);
+}
+function hideStaticWaveforms(root) {
+  root.traverse(object=>{
+    if(object.isMesh && isStaticWaveformMeshName(object.userData?.name || object.name))
+      object.visible=false;
+  });
 }
 const sharedFloorMeta=()=>meta.floors[meta.shared_floor_template_level-1];
 function makeSimulationRoomSign() {
@@ -2703,9 +2712,7 @@ async function ensureFloor(hospitalId, level) {
     scene.add(group);
     // The GLB also contains Blender's static trace meshes. The browser canvas
     // is the sole waveform layer, so these must not sit over its live image.
-    group.traverse(o => {
-      if (o.isMesh && isStaticWaveformMeshName(o.name)) o.visible = false;
-    });
+    hideStaticWaveforms(group);
     let hinge = null;
     group.traverse(o => { if (o.name.includes('Elevator_door_hinge')) hinge = o; });
     if (!hinge) throw Error(`Floor ${level}: elevator landing hinge missing`);
