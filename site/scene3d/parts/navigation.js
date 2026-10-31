@@ -286,6 +286,7 @@ async function setFloor(number, moveCamera = true) {
   updateOpenFeedButton();
   updateToolbarSelection();
   attachCubeToFloor(number);
+  updateCubeInspector();
   floors.forEach((f, i) => { if(f)f.group.visible = i === number - 1; });
   document.querySelectorAll('[data-floor]').forEach(b => b.classList.toggle('active', Number(b.dataset.floor) === number));
   document.querySelector('#elevatorDoor').textContent = doorTargets[number - 1] > 40 ? 'Close elevator' : 'Open elevator';

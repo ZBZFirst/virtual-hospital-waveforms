@@ -22,23 +22,45 @@ const cube={faces,focused:false,targetScale:.25,hovered:null,drag:null,selectedF
   autoBeforeInspect:null,auto:{enabled:true,pauseUntil:0,lastNow:0,yawProgress:0},
   rotor:{rotation:{x:0,y:0}}};
 const travels=[];
+const composites=[];
+const faceContext={fillRect(){},strokeRect(){},fillText(){},save(){},restore(){},
+  set globalCompositeOperation(value){composites.push(value);}};
+for(const face of faces){face.canvas={getContext:()=>faceContext};face.texture={needsUpdate:false};}
 const context={grandCube:cube,activeFloor:1,activeHospital:'A',walkMode:false,tourPlaying:false,
   renderer:{domElement:canvas},cubeHint:{style:{},textContent:''},controls:{enabled:true,addEventListener(){}},
   document:{querySelector:selector=>buttons.get(selector),querySelectorAll:selector=>
     selector==='[data-cube-floor]'?floors:[]},
   performance:{now:()=>1000},updateControlHelp(){},pickCubeFace:event=>event.face||null,
   startCubePhase(){},overview(){},setFloor:async(floor,moveCamera)=>{travels.push([floor,moveCamera]);},
+  floorRecords:[],ventRecordForRoom:()=>null,roomAssignment:()=>({}),drawGrandSlot(){},
 };
 vm.createContext(context);
 vm.runInContext(section,context);
+const drawStart=source.indexOf('function drawCubeFace(');
+vm.runInContext(source.slice(drawStart,source.indexOf('\nfunction drawCubeFaces(',drawStart)),context);
 vm.runInContext('setGrandCubeFocused(true)',context);
 assert.equal(cube.auto.enabled,false);
 assert.equal(panel.hidden,false);
+context.drawCubeFace(faces[0],0,1000);
+assert.deepEqual(composites,['difference'],'the current floor face is inverted');
+composites.length=0;
+context.drawCubeFace(faces[1],0,1000);
+assert.deepEqual(composites,[],'an unselected other floor keeps its normal colors');
 const pointer=(type,face,x,y)=>canvas.handlers.get(type)({button:0,pointerId:1,clientX:x,clientY:y,face,
   preventDefault(){},stopImmediatePropagation(){}});
 pointer('pointerdown',faces[1],10,10);
 pointer('pointerup',faces[1],10,10);
 assert.equal(cube.selectedFloor,2,'click selects a floor');
+assert.equal(floors[0].dataset.current,'true');
+assert.equal(floors[1].dataset.current,'false');
+composites.length=0;
+context.drawCubeFace(faces[1],0,1000);
+assert.deepEqual(composites,['multiply'],'a selected other floor has its own highlight');
+context.activeFloor=2;context.updateCubeInspector();
+composites.length=0;context.drawCubeFace(faces[1],0,1000);
+assert.deepEqual(composites,['difference'],'the inverted face follows the current floor after travel');
+assert.equal(floors[1].dataset.current,'true');
+context.activeFloor=1;context.updateCubeInspector();
 assert.deepEqual(travels,[],'click must never travel');
 assert.equal(buttons.get('#cubeVisit').textContent,'Visit Floor 2');
 pointer('pointerdown',faces[2],10,10);

@@ -105,8 +105,10 @@ function pickCubeFace(event) {
 
 function paintCubeFaceStates() {
   if(!grandCube)return;
-  for(const face of grandCube.faces)face.mesh.material.color.setHex(
-    face.floor===grandCube.selectedFloor?0x58d9e8:face===grandCube.hovered?0xc8f5ff:0xffffff);
+  for(const face of grandCube.faces){
+    face.mesh.material.color.setHex(face===grandCube.hovered?0xe4faff:0xffffff);
+    face.lastDrawTime=0;
+  }
 }
 
 function updateCubeInspector() {
@@ -116,10 +118,14 @@ function updateCubeInspector() {
   const selected=grandCube.selectedFloor;
   document.querySelector('#cubeHospital').textContent=activeHospital;
   document.querySelector('#cubeSelection').textContent=selected
-    ? selected===activeFloor?`Floor ${selected} is the current floor.`:`Floor ${selected} selected. Use Visit Floor ${selected} to travel.`
-    : 'Select a floor to visit. Dragging only rotates the cube.';
-  for(const button of panel.querySelectorAll('[data-cube-floor]'))
+    ? selected===activeFloor?`Floor ${activeFloor} is current and selected.`:`Floor ${activeFloor} is current. Floor ${selected} is selected; use Visit Floor ${selected} to travel.`
+    : `Floor ${activeFloor} is current. Select another floor to visit.`;
+  for(const button of panel.querySelectorAll('[data-cube-floor]')){
+    const floor=Number(button.dataset.cubeFloor);
     button.setAttribute('aria-pressed',String(Number(button.dataset.cubeFloor)===selected));
+    button.dataset.current=String(floor===activeFloor);
+    button.setAttribute('aria-label',`Floor ${floor}${floor===activeFloor?', current floor':''}${floor===selected?', selected':''}`);
+  }
   const visit=document.querySelector('#cubeVisit');
   visit.disabled=!selected || selected===activeFloor;
   visit.textContent=selected===activeFloor?'Current floor':selected?`Visit Floor ${selected}`:'Select a floor';
@@ -302,6 +308,19 @@ function drawCubeFace(face, elapsed, now) {
     c.fillStyle='#cde9ec';c.font='bold 20px system-ui';c.fillText(`ROOM ${String(room).padStart(2,'0')}`,x+9,y+26);
     c.fillStyle='#8bb1b8';c.font='14px system-ui';c.fillText(assignment?.uc_davis_recording?'UC DAVIS':assignment?.telemetry_record?vital?.id?.toUpperCase()||'MGH LOADING':'UNASSIGNED',x+141,y+25);
     for(let row=0;row<7;row++) drawGrandSlot(c,x+6,y+36+row*50,w-12,50,room,row,vital,vent,elapsed,assignment);
+  }
+  const current=floor===activeFloor,selected=floor===grandCube.selectedFloor;
+  if(current||selected){
+    c.save();
+    c.globalCompositeOperation=current?'difference':'multiply';
+    c.fillStyle=current?'#ffffff':'#8bc3cb';c.fillRect(0,0,1280,1280);
+    c.restore();
+  }
+  if(current||selected){
+    c.strokeStyle=current?'#0d5362':'#80e8ee';c.lineWidth=11;c.strokeRect(6,6,1268,1268);
+    c.fillStyle=current?'#0e4650':'#155763';c.fillRect(970,12,295,48);
+    c.fillStyle='#f5fcff';c.font='bold 21px system-ui';
+    c.fillText(current&&selected?'CURRENT · SELECTED':current?'CURRENT FLOOR':'SELECTED FLOOR',986,43);
   }
   face.texture.needsUpdate=true;
   face.lastDrawElapsed=elapsed;
