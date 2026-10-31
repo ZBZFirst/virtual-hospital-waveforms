@@ -172,7 +172,9 @@ async function ensureFloor(hospitalId, level) {
     });
     const badge=makeFloorBadge(level);
     group.add(badge);
-    state.floors[level-1] = { group, roof, badge, screens, ventScreens, monitors, patients, proxies, bedRigs, roomDoors, sourceLevel };
+    const labels=makeFloorLabels(hospitalId,level);
+    group.add(labels);
+    state.floors[level-1] = { group, roof, badge, labels, screens, ventScreens, monitors, patients, proxies, bedRigs, roomDoors, sourceLevel };
     return state.floors[level-1];
   })();
   floorLoads.set(key,promise);
