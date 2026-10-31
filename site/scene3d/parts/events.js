@@ -152,6 +152,9 @@ document.addEventListener('keydown', event => {
   if (walkMode && key === 'i' && !event.repeat) { document.querySelector('#inspectTarget').click(); event.preventDefault(); }
   if (walkMode && tabletEquipped && key === '[' && !event.repeat) { cycleTabletRoom(-1); event.preventDefault(); }
   if (walkMode && tabletEquipped && key === ']' && !event.repeat) { cycleTabletRoom(1); event.preventDefault(); }
+  if (embedded && key === 'escape' && !event.defaultPrevented &&
+      document.pointerLockElement !== renderer.domElement)
+    parent.postMessage({type:'zebezo-scene-escape'},location.origin);
 });
 document.addEventListener('keyup', event => movementKeys.delete(event.key.toLowerCase()));
 addEventListener('blur', () => movementKeys.clear());

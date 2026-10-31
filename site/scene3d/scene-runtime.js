@@ -698,6 +698,7 @@ document.addEventListener('keydown',event=>{
     controlsLegend.hidden=true;
     controlsHelpButton.setAttribute('aria-expanded','false');
     controlsHelpButton.focus();
+    event.preventDefault();
   }
 });
 updateControlHelp();
@@ -2387,6 +2388,9 @@ document.addEventListener('keydown', event => {
   if (walkMode && key === 'i' && !event.repeat) { document.querySelector('#inspectTarget').click(); event.preventDefault(); }
   if (walkMode && tabletEquipped && key === '[' && !event.repeat) { cycleTabletRoom(-1); event.preventDefault(); }
   if (walkMode && tabletEquipped && key === ']' && !event.repeat) { cycleTabletRoom(1); event.preventDefault(); }
+  if (embedded && key === 'escape' && !event.defaultPrevented &&
+      document.pointerLockElement !== renderer.domElement)
+    parent.postMessage({type:'zebezo-scene-escape'},location.origin);
 });
 document.addEventListener('keyup', event => movementKeys.delete(event.key.toLowerCase()));
 addEventListener('blur', () => movementKeys.clear());
@@ -2609,6 +2613,9 @@ animate();
 // Source: scene3d/parts/floor-loader.js
 let sharedPatientAssets = null;
 let simulationSignTexture = null;
+function isStaticWaveformMeshName(name) {
+  return /(?:_trace$|_rolling_(?:pressure|flow|calculated_volume)$|\brolling (?:pressure|flow|calculated volume)\b|\bventilator screen trace\b)/i.test(name);
+}
 const sharedFloorMeta=()=>meta.floors[meta.shared_floor_template_level-1];
 function makeSimulationRoomSign() {
   if(!simulationSignTexture){
@@ -2697,7 +2704,7 @@ async function ensureFloor(hospitalId, level) {
     // The GLB also contains Blender's static trace meshes. The browser canvas
     // is the sole waveform layer, so these must not sit over its live image.
     group.traverse(o => {
-      if (o.isMesh && /(?:_trace|_rolling_(pressure|flow|calculated_volume))$/i.test(o.name)) o.visible = false;
+      if (o.isMesh && isStaticWaveformMeshName(o.name)) o.visible = false;
     });
     let hinge = null;
     group.traverse(o => { if (o.name.includes('Elevator_door_hinge')) hinge = o; });

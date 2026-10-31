@@ -1745,7 +1745,14 @@ function setupEvents() {
   $('closeDetail').onclick=closeDetails;
   els.directoryOverlay.addEventListener('pointerdown',e=>{if(e.target===els.directoryOverlay)closeDirectory();});
   els.detailOverlay.addEventListener('pointerdown',e=>{if(e.target===els.detailOverlay)closeDetails();});
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(unitCubes.grid.windows.size)unitCubes.grid.closeAll();else if(!$('unitCubeOverlay').hidden)unitCubes.close();else if(!els.detailOverlay.hidden)closeDetails();else if(!els.directoryOverlay.hidden)closeDirectory();else if(mobileMenuOpen)setMobileMenu(false,true);}});
+  document.addEventListener('keydown',e=>{
+    if(e.key!=='Escape')return;
+    if(unitCubes.grid.windows.size){unitCubes.grid.closeAll();e.preventDefault();}
+    else if(!$('unitCubeOverlay').hidden){unitCubes.close();e.preventDefault();}
+    else if(!els.detailOverlay.hidden){closeDetails();e.preventDefault();}
+    else if(!els.directoryOverlay.hidden){closeDirectory();e.preventDefault();}
+    else if(mobileMenuOpen){setMobileMenu(false,true);e.preventDefault();}
+  });
   window.addEventListener('resize',()=>{if(state.unitPlayback)drawUnitPlayback();else document.querySelectorAll('.mini-pair').forEach(canvas=>drawMiniPair(canvas,canvas._preview));});
   els.search.addEventListener('input',()=>{state.filter=els.search.value.trim().toLowerCase();listEntries();drawAtlas();});
   const sceneAction=action=>document.getElementById('hospitalScene')?.contentWindow?.postMessage({type:'zebezo-scene-action',action},location.origin);
@@ -2026,8 +2033,18 @@ function setupStreamerMode(){
   }
   clean.addEventListener('click',()=>setClean(true));
   restore.addEventListener('click',()=>setClean(false));
+  function handleStreamerEscape(){
+    if(panel.hidden)return;
+    if(!$('streamerEditor').hidden){window.StreamerMask.hideEditor();return;}
+    if(document.body.classList.contains('streamer-clean')){setClean(false);return;}
+    close();
+  }
   addEventListener('keydown',event=>{
-    if(event.key==='Escape'&&document.body.classList.contains('streamer-clean'))setClean(false);
+    if(event.key==='Escape'&&!event.defaultPrevented)handleStreamerEscape();
+  });
+  addEventListener('message',event=>{
+    if(event.origin===location.origin&&event.source===sceneFrame.contentWindow&&
+       event.data?.type==='zebezo-scene-escape')handleStreamerEscape();
   });
   function close(){
     window.StreamerMask.stop();window.StreamerMask.hideEditor();panel.hidden=true;retry.hidden=true;

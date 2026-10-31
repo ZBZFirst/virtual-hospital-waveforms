@@ -141,8 +141,18 @@ function setupStreamerMode(){
   }
   clean.addEventListener('click',()=>setClean(true));
   restore.addEventListener('click',()=>setClean(false));
+  function handleStreamerEscape(){
+    if(panel.hidden)return;
+    if(!$('streamerEditor').hidden){window.StreamerMask.hideEditor();return;}
+    if(document.body.classList.contains('streamer-clean')){setClean(false);return;}
+    close();
+  }
   addEventListener('keydown',event=>{
-    if(event.key==='Escape'&&document.body.classList.contains('streamer-clean'))setClean(false);
+    if(event.key==='Escape'&&!event.defaultPrevented)handleStreamerEscape();
+  });
+  addEventListener('message',event=>{
+    if(event.origin===location.origin&&event.source===sceneFrame.contentWindow&&
+       event.data?.type==='zebezo-scene-escape')handleStreamerEscape();
   });
   function close(){
     window.StreamerMask.stop();window.StreamerMask.hideEditor();panel.hidden=true;retry.hidden=true;

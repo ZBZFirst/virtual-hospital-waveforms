@@ -1,0 +1,20 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const source=fs.readFileSync('scene3d/parts/floor-loader.js','utf8');
+const start=source.indexOf('function isStaticWaveformMeshName(');
+const end=source.indexOf('\n}\n',start);
+assert(start>=0 && end>start);
+const context=vm.createContext({});
+vm.runInContext(source.slice(start,end+2),context);
+const bytes=fs.readFileSync('scene3d/ward_floor_02.glb');
+assert.equal(bytes.toString('ascii',0,4),'glTF');
+const jsonLength=bytes.readUInt32LE(12);
+const glb=JSON.parse(bytes.toString('utf8',20,20+jsonLength));
+const staticTraces=glb.nodes.filter(node=>node.mesh!==undefined && /rolling (?:pressure|flow|calculated volume)/i.test(node.name||''));
+assert.equal(staticTraces.length,18,'shared floor has three baked traces in each of six ventilator rooms');
+for(const node of staticTraces)assert(context.isStaticWaveformMeshName(node.name),`still visible: ${node.name}`);
+for(const node of glb.nodes.filter(node=>node.mesh!==undefined && /ventilator monitor screen|full-feed screen overlay/i.test(node.name||'')))
+  assert(!context.isStaticWaveformMeshName(node.name),`live monitor surface hidden: ${node.name}`);
+console.log('All 18 baked ventilator traces are hidden; live screen meshes remain');

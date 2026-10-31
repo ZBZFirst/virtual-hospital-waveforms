@@ -30,6 +30,7 @@ document.addEventListener('keydown',event=>{
     controlsLegend.hidden=true;
     controlsHelpButton.setAttribute('aria-expanded','false');
     controlsHelpButton.focus();
+    event.preventDefault();
   }
 });
 updateControlHelp();

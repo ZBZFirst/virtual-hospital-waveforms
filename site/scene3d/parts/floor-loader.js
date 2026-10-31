@@ -1,5 +1,8 @@
 let sharedPatientAssets = null;
 let simulationSignTexture = null;
+function isStaticWaveformMeshName(name) {
+  return /(?:_trace$|_rolling_(?:pressure|flow|calculated_volume)$|\brolling (?:pressure|flow|calculated volume)\b|\bventilator screen trace\b)/i.test(name);
+}
 const sharedFloorMeta=()=>meta.floors[meta.shared_floor_template_level-1];
 function makeSimulationRoomSign() {
   if(!simulationSignTexture){
@@ -88,7 +91,7 @@ async function ensureFloor(hospitalId, level) {
     // The GLB also contains Blender's static trace meshes. The browser canvas
     // is the sole waveform layer, so these must not sit over its live image.
     group.traverse(o => {
-      if (o.isMesh && /(?:_trace|_rolling_(pressure|flow|calculated_volume))$/i.test(o.name)) o.visible = false;
+      if (o.isMesh && isStaticWaveformMeshName(o.name)) o.visible = false;
     });
     let hinge = null;
     group.traverse(o => { if (o.name.includes('Elevator_door_hinge')) hinge = o; });

@@ -17,7 +17,7 @@ assert(css.includes('streamer-clean .site-head'));
 const handlers=new Map(),elements=new Map(),storage=new Map();
 function element(id){
   if(!elements.has(id))elements.set(id,{
-    hidden:id==='streamerWindow'||id==='streamerLayout',style:{},dataset:{},offsetWidth:300,offsetHeight:220,
+    hidden:id==='streamerWindow'||id==='streamerLayout'||id==='streamerEditor',style:{},dataset:{},offsetWidth:300,offsetHeight:220,
     clientWidth:1920,clientHeight:1080,textContent:'',srcObject:null,
     listeners:new Map(),addEventListener(type,callback){this.listeners.set(type,callback);},
     setAttribute(key,value){this[key]=value;},
@@ -27,12 +27,13 @@ function element(id){
   return elements.get(id);
 }
 const bodyClasses=new Set();
+element('hospitalScene').contentWindow={postMessage(){}};
 const body={dataset:{},classList:{add:value=>bodyClasses.add(value),remove:value=>bodyClasses.delete(value),
   contains:value=>bodyClasses.has(value),toggle:(value,enabled)=>enabled?bodyClasses.add(value):bodyClasses.delete(value)}};
 let stopped=false;
 let themeValue='original';
 const context=vm.createContext({
-  $:element,document:{body,documentElement:{dataset:{}}},
+  $:element,document:{body,documentElement:{dataset:{}}},location:{origin:'https://example.test'},
   window:{StreamerMask:{start:async()=>true,stop:()=>{stopped=true;},hideEditor:()=>{},showEditor:()=>{},fitWindowToCrop:()=>{}},
     ZeBeZoTheme:{getTheme:()=>themeValue,setTheme:value=>{themeValue=value;}}},
   localStorage:{getItem:key=>storage.get(key),setItem:(key,value)=>storage.set(key,value)},
@@ -69,9 +70,15 @@ function click(id){element(id).listeners.get('click')();}
   click('streamerClean');
   handlers.get('keydown')({key:'Escape'});
   assert(!bodyClasses.has('streamer-clean'));
-  click('streamerToggle');
+  assert(bodyClasses.has('streamer-mode'),'first Escape restores hidden controls');
+  handlers.get('keydown')({key:'Escape'});
   assert(!bodyClasses.has('streamer-mode'));
   assert.equal(element('streamerLayout').hidden,true);
   assert(stopped,'closing streamer mode stops the camera');
+  click('streamerToggle');
+  assert(bodyClasses.has('streamer-mode'));
+  handlers.get('message')({origin:'https://example.test',source:element('hospitalScene').contentWindow,
+    data:{type:'zebezo-scene-escape'}});
+  assert(!bodyClasses.has('streamer-mode'),'Escape from the scene iframe exits streamer mode');
   console.log('Streamer mode switches OBS aspect layouts and closes the camera');
 })().catch(error=>{console.error(error);process.exitCode=1;});
