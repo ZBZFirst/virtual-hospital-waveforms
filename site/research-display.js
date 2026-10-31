@@ -11,7 +11,9 @@
   const tile = (label,id,unit) => `<div><span>${label}</span><strong id="r-${id}">—</strong><small>${unit}</small></div>`;
   function createPanel() {
     const panel=document.createElement('section');
-    panel.id='research-panel';panel.className='panel research-panel';
+    // Keep this full-size overlay transparent. The shared site theme paints
+    // generic panel classes with an opaque background over the charts.
+    panel.id='research-panel';panel.className='research-overlay';
     panel.setAttribute('aria-live','polite');
     panel.innerHTML=`
       <p id="research-status" class="research-status">Awaiting a completed breath.</p>

@@ -5,7 +5,7 @@
   const ids=['ventmap','mechanics','heuristics'];
   const clock=s=>{const n=Math.floor(s);return `${String(Math.floor(n/3600)).padStart(2,'0')}:${String(Math.floor(n%3600/60)).padStart(2,'0')}:${String(n%60).padStart(2,'0')}`;};
   const panel=window.BreathAnalysis.createPanel();
-  panel.classList.add('room-research-panel');
+  panel.classList.add('room-research-overlay');
   let perspective='zebezo', visible=true, activeMobile='ventmap';
   let mode='review', sequenceMap={},liveBreath=null,liveResearch=null;
   let entry=null, data=null, position=0, bounds=null, selected=null;
