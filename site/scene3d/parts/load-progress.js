@@ -12,7 +12,7 @@ const formatModelBytes = value => `${(value / 1048576).toFixed(1)} MiB`;
 
 function paintModelLoad() {
   if (!activeModelLoad) return;
-  const { paths, title, kind } = activeModelLoad;
+  const { paths, title, kind, buildSteps, builtSteps, buildPhase } = activeModelLoad;
   let loaded = 0, total = 0, pending = 0;
   for (const path of paths) {
     const transfer = modelTransfers.get(path);
@@ -21,9 +21,14 @@ function paintModelLoad() {
     loaded += transfer?.complete ? size : Math.min(transfer?.loaded || 0, size);
     if (!transfer?.complete) pending++;
   }
-  const percent = total ? Math.min(100, Math.round(loaded * 100 / total)) : 0;
-  const amount = total ? `${formatModelBytes(loaded)} / ${formatModelBytes(total)} · ${percent}%` : 'Preparing model download…';
-  const phase = pending ? 'Downloading 3D models' : 'Download complete · preparing rooms…';
+  const downloadFraction=total?Math.min(1,loaded/total):1;
+  const buildFraction=buildSteps?Math.min(1,builtSteps/buildSteps):1;
+  const percent=Math.min(100,Math.round(100*(buildSteps ? .35*downloadFraction+.65*buildFraction : downloadFraction)));
+  const amount=buildSteps?
+    `${builtSteps} of ${buildSteps} floors ready · ${percent}%`:
+    total?`${formatModelBytes(loaded)} / ${formatModelBytes(total)} · ${percent}%`:'Preparing scene…';
+  const phase=pending?'Downloading 3D models · floor plan visible behind this card':
+    buildSteps?buildPhase||'Building rooms and equipment…':'Download complete · preparing scene…';
   modelLoadingTitle.textContent = title;
   modelLoadingBar.value = percent;
   modelLoadingAmount.textContent = amount;
@@ -31,12 +36,19 @@ function paintModelLoad() {
   if (embedded) parent.postMessage({ type: 'zebezo-scene-progress', active: true, kind, title, percent, amount, phase }, location.origin);
 }
 
-function beginModelLoad(kind, title, paths) {
+function beginModelLoad(kind, title, paths, buildSteps=0) {
   const token = ++modelLoadSerial;
-  activeModelLoad = { token, kind, title, paths: [...new Set(paths)] };
+  activeModelLoad = { token, kind, title, paths: [...new Set(paths)], buildSteps, builtSteps:0, buildPhase:'' };
   modelLoading.hidden = false;
   paintModelLoad();
   return token;
+}
+
+function advanceModelBuild(token,builtSteps,phase) {
+  if(activeModelLoad?.token!==token)return;
+  activeModelLoad.builtSteps=Math.min(activeModelLoad.buildSteps,builtSteps);
+  activeModelLoad.buildPhase=phase;
+  paintModelLoad();
 }
 
 function finishModelLoad(token) {

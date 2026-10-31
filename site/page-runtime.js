@@ -1682,8 +1682,8 @@ function setupEvents() {
     els.sceneLoading.hidden=false;
     if(status==='loading'){
       delete els.sceneLoading.dataset.modelProgress;
-      sceneLoadingProgress.removeAttribute('value');
-      sceneLoadingAmount.textContent='Waiting for scene assets…';
+      sceneLoadingProgress.value=0;
+      sceneLoadingAmount.textContent='0% · preparing scene assets…';
     }
     els.sceneLoadingTitle.textContent=status==='error'?'Could not load 3D hospitals':status==='slow'?'Still loading 3D hospitals…':'Loading 3D hospitals…';
     els.sceneLoadingMessage.textContent=detail||'Preparing the hospital scene…';

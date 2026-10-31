@@ -52,6 +52,7 @@ function finishFloorReveal(level){
   for(const binding of reveal.bindings)binding.object.material=binding.original;
   for(const material of reveal.copies)material.dispose();
   floorReveals.delete(level);removeFloorPreview(level);
+  reveal.resolve?.();
 }
 function clearFloorReveals(){
   for(const level of [...floorReveals.keys()])finishFloorReveal(level);
@@ -76,7 +77,8 @@ function revealFloor(level,floor,site){
   floor.group.position.copy(expandedFloorPosition(level,site));
   floor.group.visible=true;floor.roof.visible=false;floor.badge.visible=true;
   floor.patients.forEach((patient,room)=>{if(patient){patient.visible=false;floor.proxies[room].visible=true;}});
-  floorReveals.set(level,{start:performance.now(),duration:650,bindings,copies:[...copies.values()],originals:copies});
+  return new Promise(resolve=>floorReveals.set(level,{start:performance.now(),duration:650,
+    bindings,copies:[...copies.values()],originals:copies,resolve}));
 }
 function tickFloorReveals(now){
   for(const [level,reveal] of floorReveals){

@@ -19,6 +19,7 @@
     #help { position: fixed; left: 16px; bottom: 14px; z-index: 2; background: #132731d9; padding: 7px 10px; border-radius: 5px; color: #c5e3e9; }
     #error { position: fixed; right: 16px; bottom: 14px; z-index: 3; max-width: 460px; background: #5d2029; padding: 10px; display: none; }
     #modelLoading[hidden] { display: none; }
+    .embedded #modelLoading { display: none; }
     #modelLoading { position: fixed; inset: 0; z-index: 7; display: grid; place-items: center; padding: 16px; background: #07192355; pointer-events: none; }
     .model-loading-card { box-sizing: border-box; width: min(520px, 100%); padding: 24px; border: 1px solid #69afc0; border-radius: 12px; background: #102c3af5; box-shadow: 0 18px 50px #0009; text-align: center; }
     .model-loading-card strong { display: block; font-size: 20px; }
@@ -95,7 +96,7 @@
 </head>
 <body>
   <div id="view"></div>
-  <div id="modelLoading" role="status" aria-live="polite" hidden><div class="model-loading-card"><strong id="modelLoadingTitle">Loading floor…</strong><progress id="modelLoadingBar" max="100" value="0" aria-label="3D model download progress"></progress><output id="modelLoadingAmount" aria-live="off">0%</output><small id="modelLoadingPhase">Downloading 3D models</small></div></div>
+  <div id="modelLoading" role="status" aria-live="polite" hidden><div class="model-loading-card"><strong id="modelLoadingTitle">Loading floor…</strong><progress id="modelLoadingBar" max="100" value="0" aria-label="3D scene build progress"></progress><output id="modelLoadingAmount" aria-live="off">0%</output><small id="modelLoadingPhase">Downloading 3D models</small></div></div>
   <div id="bar">
     <div id="barHeader"><strong>ZeBeZo hospital campus</strong><button id="toggleControls" aria-expanded="false" aria-controls="bar">Controls ▾</button></div>
     <div id="toolbarTabs" role="tablist" aria-label="Hospital controls"><button class="toolbar-tab" id="locationTab" type="button" role="tab" aria-selected="true" aria-controls="locationRow">Location</button><button class="toolbar-tab" id="viewTab" type="button" role="tab" aria-selected="false" aria-controls="viewRow">Views</button><button class="toolbar-tab" id="patientTab" type="button" role="tab" aria-selected="false" aria-controls="patientRow">Patient</button><button class="toolbar-tab" id="motionTab" type="button" role="tab" aria-selected="false" aria-controls="motionRow">Motion</button></div>
@@ -128,6 +129,6 @@
     <div id="vitalCharts" class="vital-charts"><div class="vital-chart"><canvas id="vitalChart0" aria-label="ECG lead II waveform"></canvas></div><div class="vital-chart"><canvas id="vitalChart1" aria-label="Arterial pressure waveform"></canvas></div><div class="vital-chart"><canvas id="vitalChart2" aria-label="Central venous pressure waveform"></canvas></div><div class="vital-chart"><canvas id="vitalChart3" aria-label="Pulmonary arterial pressure waveform"></canvas></div></div>
     <small>Full PhysioNet MGH/MF source recording. Channels are shown only when present. <a href="https://physionet.org/content/mghdb/1.0.0/" target="_blank" rel="noopener" style="color:#9bdae9">Source and attribution</a></small>
   </section>
-  <script type="module" src="./viewer.js?v=20261030-shared-floor2"></script>
+  <script type="module" src="./viewer.js?v=20261031-scene-build1"></script>
 </body>
 </html>
