@@ -24,7 +24,7 @@ function makeGrandCube(hospitalId) {
     mesh.rotation.set(...rotation);
     mesh.userData.floor = floor;
     rotor.add(mesh);
-    return {floor,canvas,texture,mesh,drawCount:0,lastDrawTime:0};
+    return {floor,canvas,texture,mesh,drawCount:0,lastDrawTime:0,enlargedRoom:null};
   });
   group.position.set(0,1.35,0.3);
   group.scale.setScalar(0.25);
@@ -92,7 +92,7 @@ function updateCubeAuto(now) {
 }
 
 const cubeRaycaster = new THREE.Raycaster();
-function pickCubeFace(event) {
+function pickCubeFaceHit(event) {
   if(!grandCube || !grandCube.group.visible)return null;
   const rect=renderer.domElement.getBoundingClientRect();
   const point=new THREE.Vector2(2*(event.clientX-rect.left)/rect.width-1,1-2*(event.clientY-rect.top)/rect.height);
@@ -100,7 +100,35 @@ function pickCubeFace(event) {
   grandCube.group.updateMatrixWorld(true);
   cubeRaycaster.setFromCamera(point,camera);
   const hit=cubeRaycaster.intersectObjects(grandCube.faces.map(face=>face.mesh),false)[0];
-  return hit ? grandCube.faces.find(face=>face.mesh===hit.object) : null;
+  const face=hit && grandCube.faces.find(item=>item.mesh===hit.object);
+  return face ? {face,uv:hit.uv} : null;
+}
+function pickCubeFace(event) { return pickCubeFaceHit(event)?.face || null; }
+
+function cubeRoomAtUv(uv) {
+  if(!uv)return null;
+  const x=uv.x*1280,y=(1-uv.y)*1280;
+  if(x<12||x>=1278||y<75||y>=1266)return null;
+  const column=Math.floor((x-12)/634),tier=Math.floor((y-75)/400);
+  if(column>1||tier>2||x-(12+column*634)>=622||y-(75+tier*400)>=391)return null;
+  return tier*2+column+1;
+}
+
+function toggleCubeRoomEnlargement(event) {
+  if(!grandCube?.focused)return false;
+  const hit=pickCubeFaceHit(event);
+  if(!hit)return false;
+  const {face}=hit;
+  if(face.enlargedRoom)face.enlargedRoom=null;
+  else {
+    const room=cubeRoomAtUv(hit.uv);
+    if(!room||!roomAssignment(activeHospital,face.floor,room)?.patient_id)return true;
+    face.enlargedRoom=room;
+  }
+  face.lastDrawTime=0;
+  grandCube.auto.pauseUntil=performance.now()+7000;
+  setCubeHover(face,event);
+  return true;
 }
 
 function paintCubeFaceStates() {
@@ -156,14 +184,17 @@ function selectCubeFloor(floor) {
 }
 
 function setCubeHover(face,event) {
-  if(!grandCube || grandCube.hovered===face)return;
-  if(grandCube.hovered && !face)grandCube.auto.pauseUntil=performance.now()+2000;
-  grandCube.hovered=face;
-  paintCubeFaceStates();
-  renderer.domElement.style.cursor=face?'grab':'';
-  cubeHint.style.display=face?'block':'none';
+  if(!grandCube)return;
+  if(grandCube.hovered!==face){
+    if(grandCube.hovered && !face)grandCube.auto.pauseUntil=performance.now()+2000;
+    grandCube.hovered=face;
+    paintCubeFaceStates();
+    renderer.domElement.style.cursor=face?'grab':'';
+    cubeHint.style.display=face?'block':'none';
+  }
   if(face)cubeHint.textContent=grandCube.focused
-    ? `Floor ${face.floor} · click to select · drag to rotate`
+    ? face.enlargedRoom?`Floor ${face.floor} · Room ${face.enlargedRoom} enlarged · right-click to show all rooms`:
+      `Floor ${face.floor} · click to select · right-click a patient to enlarge · drag to rotate`
     : 'Click to focus nursing cube';
   if(face && event){cubeHint.style.left=`${event.clientX+13}px`;cubeHint.style.top=`${event.clientY+13}px`;}
 }
@@ -231,6 +262,10 @@ document.querySelector('#cubeRotationToggle').addEventListener('click',()=>setCu
 document.querySelector('#cubeClose').addEventListener('click',()=>overview());
 
 renderer.domElement.addEventListener('pointerdown',event=>{
+  if(event.button===2){
+    if(grandCube?.focused&&pickCubeFace(event)){event.preventDefault();event.stopImmediatePropagation();}
+    return;
+  }
   if(event.button!==0)return;
   const face=pickCubeFace(event);
   if(!face)return;
@@ -239,6 +274,9 @@ renderer.domElement.addEventListener('pointerdown',event=>{
   renderer.domElement.setPointerCapture(event.pointerId);
   controls.enabled=false;
   renderer.domElement.style.cursor='grabbing';
+},{capture:true});
+renderer.domElement.addEventListener('contextmenu',event=>{
+  if(toggleCubeRoomEnlargement(event))event.preventDefault();
 },{capture:true});
 renderer.domElement.addEventListener('pointermove',event=>{
   const drag=grandCube?.drag;
@@ -295,10 +333,19 @@ function drawCubeFace(face, elapsed, now) {
   const c=face.canvas.getContext('2d'), floor=face.floor;
   c.fillStyle='#06171e';c.fillRect(0,0,1280,1280);
   c.fillStyle='#ddf0f2';c.font='bold 30px system-ui';
-  c.fillText(`HOSPITAL ${activeHospital} · FLOOR ${floor} · UNIT TELEMETRY`,18,38);
+  c.fillText(face.enlargedRoom?
+    `HOSPITAL ${activeHospital} · FLOOR ${floor} · ROOM ${String(face.enlargedRoom).padStart(2,'0')}`:
+    `HOSPITAL ${activeHospital} · FLOOR ${floor} · UNIT TELEMETRY`,18,38);
   c.fillStyle='#83aab2';c.font='16px system-ui';
-  c.fillText('6 rooms · ECG II / ART / CVP / PAP / ventilator P / flow / volume',18,63);
-  for(let room=1;room<=6;room++) {
+  c.fillText(face.enlargedRoom?'Patient waveforms · right-click to show all 6 rooms':
+    '6 rooms · ECG II / ART / CVP / PAP / ventilator P / flow / volume',18,63);
+  if(face.enlargedRoom){
+    const room=face.enlargedRoom;
+    const vital=floorRecords[floor-1]?.[room-1] || null;
+    const vent=ventRecordForRoom(room,floor);
+    const assignment=roomAssignment(activeHospital,floor,room);
+    drawMonitorLayout(c,'unit',{vital,vent,assignment},elapsed,{x:18,y:95,width:1244,height:1138});
+  }else for(let room=1;room<=6;room++) {
     const column=(room-1)%2, tier=Math.floor((room-1)/2);
     const x=12+column*634,y=75+tier*400,w=622;
     const vital=floorRecords[floor-1]?.[room-1] || null;

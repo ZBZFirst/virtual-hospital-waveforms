@@ -23,6 +23,7 @@ const cube={faces,focused:false,targetScale:.25,hovered:null,drag:null,selectedF
   rotor:{rotation:{x:0,y:0}}};
 const travels=[];
 const composites=[];
+let gridSlots=0,expandedLayouts=0;
 const faceContext={fillRect(){},strokeRect(){},fillText(){},save(){},restore(){},
   set globalCompositeOperation(value){composites.push(value);}};
 for(const face of faces){face.canvas={getContext:()=>faceContext};face.texture={needsUpdate:false};}
@@ -31,21 +32,43 @@ const context={grandCube:cube,activeFloor:1,activeHospital:'A',walkMode:false,to
   document:{querySelector:selector=>buttons.get(selector),querySelectorAll:selector=>
     selector==='[data-cube-floor]'?floors:[]},
   performance:{now:()=>1000},updateControlHelp(){},pickCubeFace:event=>event.face||null,
+  pickCubeFaceHit:event=>event.face?{face:event.face,uv:event.uv}:null,
   startCubePhase(){},overview(){},setFloor:async(floor,moveCamera)=>{travels.push([floor,moveCamera]);},
-  floorRecords:[],ventRecordForRoom:()=>null,roomAssignment:()=>({}),drawGrandSlot(){},
+  floorRecords:[],ventRecordForRoom:()=>null,roomAssignment:()=>({patient_id:'P1'}),
+  drawGrandSlot(){gridSlots++;},drawMonitorLayout(){expandedLayouts++;},
 };
 vm.createContext(context);
+const roomStart=source.indexOf('function cubeRoomAtUv(');
+vm.runInContext(source.slice(roomStart,source.indexOf('\nfunction paintCubeFaceStates(',roomStart)),context);
 vm.runInContext(section,context);
 const drawStart=source.indexOf('function drawCubeFace(');
 vm.runInContext(source.slice(drawStart,source.indexOf('\nfunction drawCubeFaces(',drawStart)),context);
 vm.runInContext('setGrandCubeFocused(true)',context);
 assert.equal(cube.auto.enabled,false);
 assert.equal(panel.hidden,false);
+for(let room=1;room<=6;room++){
+  const column=(room-1)%2,tier=Math.floor((room-1)/2);
+  assert.equal(context.cubeRoomAtUv({x:(112+column*634)/1280,y:1-(175+tier*400)/1280}),room);
+}
+assert.equal(context.cubeRoomAtUv({x:.5,y:.99}),null,'face heading is not a room');
 context.drawCubeFace(faces[0],0,1000);
 assert.deepEqual(composites,['difference'],'the current floor face is inverted');
 composites.length=0;
 context.drawCubeFace(faces[1],0,1000);
 assert.deepEqual(composites,[],'an unselected other floor keeps its normal colors');
+const gridBefore=gridSlots;
+let menuBlocked=false;
+canvas.handlers.get('contextmenu')({face:faces[0],uv:{x:112/1280,y:1-175/1280},clientX:10,clientY:10,
+  preventDefault(){menuBlocked=true;}});
+assert(menuBlocked,'cube right-click suppresses the browser menu');
+assert.equal(faces[0].enlargedRoom,1);
+context.drawCubeFace(faces[0],0,1000);
+assert.equal(gridSlots,gridBefore,'expanded room replaces the six-room grid');
+assert.equal(expandedLayouts,1,'expanded room uses the full unit waveform layout');
+canvas.handlers.get('contextmenu')({face:faces[0],uv:{x:.5,y:.99},clientX:10,clientY:10,preventDefault(){}});
+assert.equal(faces[0].enlargedRoom,null,'right-click again restores the six-room view');
+context.drawCubeFace(faces[0],0,1000);
+assert.equal(gridSlots,gridBefore+42);
 const pointer=(type,face,x,y)=>canvas.handlers.get(type)({button:0,pointerId:1,clientX:x,clientY:y,face,
   preventDefault(){},stopImmediatePropagation(){}});
 pointer('pointerdown',faces[1],10,10);
