@@ -123,12 +123,7 @@ document.querySelector('#closeTelemetry').addEventListener('click',()=>{
 });
 document.querySelector('#cubeAuto').addEventListener('click', () => {
   if(!grandCube)return;
-  grandCube.auto.enabled=!grandCube.auto.enabled;
-  grandCube.auto.lastNow=performance.now();
-  const button=document.querySelector('#cubeAuto');
-  button.textContent=grandCube.auto.enabled?'Pause rotation':'Resume rotation';
-  button.setAttribute('aria-pressed',String(grandCube.auto.enabled));
-  button.classList.toggle('active',grandCube.auto.enabled);
+  setCubeAutoRotation(!grandCube.auto.enabled);
 });
 renderer.domElement.addEventListener('click', event => { if (walkMode && !pickCubeFace(event) && document.pointerLockElement !== renderer.domElement) renderer.domElement.requestPointerLock(); });
 document.addEventListener('mousemove', event => {

@@ -227,6 +227,7 @@ function updateOpenFeedButton() {
 }
 
 function activateHospital(hospitalId) {
+  setGrandCubeFocused(false);
   setCubeHover(null);
   hideHospitalCubes();
   for(const floor of floors)if(floor){floor.group.visible=false;floor.roof.visible=false;}
@@ -239,6 +240,7 @@ function activateHospital(hospitalId) {
     cubesByHospital.set(hospitalId,cube);
   }
   grandCube=cubesByHospital.get(hospitalId);
+  updateCubeInspector();
   floors=state.floors;
   doorHinges=state.doorHinges;
   doorAngles=state.doorAngles;

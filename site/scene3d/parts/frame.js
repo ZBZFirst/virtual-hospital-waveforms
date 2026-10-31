@@ -36,6 +36,7 @@ function animate() {
     if (Math.abs(next - doorAngles[i]) > 0.01) setDoorAngle(i + 1, next);
   }
   updateCubeAuto(now);
+  updateControlHelp();
   if(grandCube) {
     const current=grandCube.group.scale.x;
     if(Math.abs(current-grandCube.targetScale)>0.0005)

@@ -160,7 +160,7 @@ function stopWalk() {
   document.querySelector('#walk').classList.remove('active');
   document.querySelector('#walk').setAttribute('aria-pressed', 'false');
   document.querySelector('#walk').textContent = 'Walk mode';
-  document.querySelector('#help').textContent = 'Drag to orbit · wheel to zoom · right drag to pan · select a floor and room above';
+  updateControlHelp();
   updateRoofs();
 }
 
@@ -189,7 +189,7 @@ async function startWalk() {
   document.querySelector('#walk').classList.add('active');
   document.querySelector('#walk').setAttribute('aria-pressed', 'true');
   document.querySelector('#walk').textContent = 'Exit walk';
-  document.querySelector('#help').textContent = 'Click scene for mouse look · W/A/S/D move · E elevator · [ / ] patient · I inspect tablet · Esc releases mouse';
+  updateControlHelp();
   placeTablet();
   updateRoofs();
 }

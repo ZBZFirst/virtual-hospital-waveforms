@@ -665,6 +665,43 @@ function drawTablet(elapsed) {
   tablet.drawCount++;
 }
 
+// Source: scene3d/parts/controls-legend.js
+const controlsHelpButton=document.querySelector('#controlsHelp');
+const controlsLegend=document.querySelector('#controlsLegend');
+let lastControlMode='';
+function updateControlHelp(){
+  const mode=grandCube?.focused?'cube':walkMode?'walk':tourPlaying?'tour':activeRoom?'patient':'scene';
+  if(mode===lastControlMode)return;
+  lastControlMode=mode;
+  const labels={scene:'Scene',cube:'Nursing cube',walk:'Walk mode',tour:'Unit walk tour',patient:'Patient room'};
+  const summaries={
+    scene:'Scene · drag to orbit · wheel to zoom · right drag to pan',
+    cube:'Nursing cube · drag to rotate · select a floor · Visit Floor to travel',
+    walk:'Walk mode · W/A/S/D move · E elevator · Esc releases mouse',
+    tour:'Unit walk tour · Play or pause · drag timeline to seek',
+    patient:'Patient room · use Patient for recordings and room controls',
+  };
+  document.querySelector('#helpSummary').textContent=summaries[mode];
+  document.querySelector('#controlMode').textContent=labels[mode];
+  for(const section of controlsLegend.querySelectorAll('[data-control-mode]')){
+    if(section.dataset.controlMode===mode)section.setAttribute('aria-current','true');
+    else section.removeAttribute('aria-current');
+  }
+}
+controlsHelpButton.addEventListener('click',()=>{
+  controlsLegend.hidden=!controlsLegend.hidden;
+  controlsHelpButton.setAttribute('aria-expanded',String(!controlsLegend.hidden));
+  updateControlHelp();
+});
+document.addEventListener('keydown',event=>{
+  if(event.key==='Escape' && !controlsLegend.hidden){
+    controlsLegend.hidden=true;
+    controlsHelpButton.setAttribute('aria-expanded','false');
+    controlsHelpButton.focus();
+  }
+});
+updateControlHelp();
+
 // Source: scene3d/parts/nursing-cube.js
 function makeGrandCube(hospitalId) {
   const size = 1.45, surface = 1.37, half = size / 2 + 0.003;
@@ -698,7 +735,7 @@ function makeGrandCube(hospitalId) {
   group.scale.setScalar(0.25);
   rotor.rotation.set(-0.12,0.22,0);
   scene.add(group);
-  return {group,rotor,faces,size,focused:false,targetScale:0.25,hovered:null,drag:null,auto:{
+  return {group,rotor,faces,size,focused:false,targetScale:0.25,hovered:null,drag:null,selectedFloor:null,autoBeforeInspect:null,auto:{
     enabled:true,phase:'horizontal',elapsed:0,yawProgress:0,
     fromX:-0.12,toX:-0.12,duration:0,pauseUntil:0,lastNow:performance.now(),
   }};
@@ -771,26 +808,82 @@ function pickCubeFace(event) {
   return hit ? grandCube.faces.find(face=>face.mesh===hit.object) : null;
 }
 
+function paintCubeFaceStates() {
+  if(!grandCube)return;
+  for(const face of grandCube.faces)face.mesh.material.color.setHex(
+    face.floor===grandCube.selectedFloor?0x58d9e8:face===grandCube.hovered?0xc8f5ff:0xffffff);
+}
+
+function updateCubeInspector() {
+  const panel=document.querySelector('#cubeInspector');
+  panel.hidden=!grandCube?.focused;
+  if(!grandCube)return;
+  const selected=grandCube.selectedFloor;
+  document.querySelector('#cubeHospital').textContent=activeHospital;
+  document.querySelector('#cubeSelection').textContent=selected
+    ? selected===activeFloor?`Floor ${selected} is the current floor.`:`Floor ${selected} selected. Use Visit Floor ${selected} to travel.`
+    : 'Select a floor to visit. Dragging only rotates the cube.';
+  for(const button of panel.querySelectorAll('[data-cube-floor]'))
+    button.setAttribute('aria-pressed',String(Number(button.dataset.cubeFloor)===selected));
+  const visit=document.querySelector('#cubeVisit');
+  visit.disabled=!selected || selected===activeFloor;
+  visit.textContent=selected===activeFloor?'Current floor':selected?`Visit Floor ${selected}`:'Select a floor';
+  document.querySelector('#cubeRotationToggle').textContent=grandCube.auto.enabled?'Pause rotation':'Resume rotation';
+  const toolbar=document.querySelector('#cubeAuto');
+  toolbar.textContent=grandCube.auto.enabled?'Pause rotation':'Resume rotation';
+  toolbar.setAttribute('aria-pressed',String(grandCube.auto.enabled));
+  toolbar.classList.toggle('active',grandCube.auto.enabled);
+  paintCubeFaceStates();
+  updateControlHelp();
+}
+
+function setCubeAutoRotation(enabled) {
+  if(!grandCube)return;
+  grandCube.auto.enabled=enabled;
+  grandCube.auto.lastNow=performance.now();
+  if(enabled)grandCube.auto.pauseUntil=0;
+  if(grandCube.focused && enabled)grandCube.selectedFloor=null;
+  updateCubeInspector();
+}
+
+function selectCubeFloor(floor) {
+  if(!grandCube?.focused || floor<1 || floor>6)return;
+  grandCube.auto.enabled=false;
+  grandCube.auto.lastNow=performance.now();
+  grandCube.selectedFloor=floor;
+  updateCubeInspector();
+}
+
 function setCubeHover(face,event) {
   if(!grandCube || grandCube.hovered===face)return;
-  if(grandCube.hovered)grandCube.hovered.mesh.material.color.setHex(0xffffff);
   if(grandCube.hovered && !face)grandCube.auto.pauseUntil=performance.now()+2000;
   grandCube.hovered=face;
-  if(face)face.mesh.material.color.setHex(0xc8f5ff);
+  paintCubeFaceStates();
   renderer.domElement.style.cursor=face?'grab':'';
   cubeHint.style.display=face?'block':'none';
   if(face)cubeHint.textContent=grandCube.focused
-    ? `Floor ${face.floor} · click to visit · drag to turn cube`
+    ? `Floor ${face.floor} · click to select · drag to rotate`
     : 'Click to focus nursing cube';
   if(face && event){cubeHint.style.left=`${event.clientX+13}px`;cubeHint.style.top=`${event.clientY+13}px`;}
 }
 
 function setGrandCubeFocused(focused) {
   if(!grandCube)return;
+  if(focused && !grandCube.focused){
+    grandCube.autoBeforeInspect=grandCube.auto.enabled;
+    grandCube.auto.enabled=false;
+    grandCube.selectedFloor=null;
+  } else if(!focused && grandCube.focused){
+    grandCube.auto.enabled=grandCube.autoBeforeInspect??grandCube.auto.enabled;
+    grandCube.autoBeforeInspect=null;
+    grandCube.auto.lastNow=performance.now();
+    grandCube.selectedFloor=null;
+  }
   grandCube.focused=focused;
   if(focused)grandCube.faces.forEach(face=>{face.lastSourceRequest=0;});
   grandCube.targetScale=focused?1:0.25;
   if(!focused)setCubeHover(null);
+  updateCubeInspector();
 }
 
 async function focusGrandCube() {
@@ -805,7 +898,7 @@ async function focusGrandCube() {
   setGrandCubeFocused(true);
   const y=1.35+(activeFloor-1)*floorHeight;
   focus(new THREE.Vector3(0,y,0.3),new THREE.Vector3(0,y,-2.8));
-  document.querySelector('#help').textContent='Hover a cube face for its floor · drag to rotate · click a face to visit that floor';
+  updateControlHelp();
 }
 
 controls.addEventListener('end',()=>{
@@ -815,22 +908,33 @@ controls.addEventListener('end',()=>{
 });
 
 async function visitCubeFloor(floor) {
-  const previous=activeFloor;
-  if(previous===floor)return;
+  if(!grandCube?.focused || grandCube.selectedFloor!==floor || activeFloor===floor)return;
   cameraMove=null;
-  await setFloor(floor,false);
-  if(activeFloor!==floor)return;
-  const rise=(floor-previous)*floorHeight;
-  camera.position.y+=rise;
-  controls.target.y+=rise;
-  if(cabGroup)cabGroup.position.y=(floor-1)*floorHeight;
+  await setFloor(floor,true);
+  updateControlHelp();
 }
 
+document.querySelectorAll('[data-cube-floor]').forEach(button=>button.addEventListener('click',()=>selectCubeFloor(Number(button.dataset.cubeFloor))));
+document.querySelectorAll('[data-cube-rotate]').forEach(button=>button.addEventListener('click',()=>{
+  if(!grandCube?.focused)return;
+  const step=Math.PI/8;
+  const direction=button.dataset.cubeRotate;
+  grandCube.rotor.rotation.y+=(direction==='left'?-step:direction==='right'?step:0);
+  grandCube.rotor.rotation.x+=(direction==='up'?-step:direction==='down'?step:0);
+  grandCube.auto.enabled=false;
+  grandCube.auto.lastNow=performance.now();
+  updateCubeInspector();
+}));
+document.querySelector('#cubeVisit').addEventListener('click',()=>visitCubeFloor(grandCube?.selectedFloor));
+document.querySelector('#cubeRotationToggle').addEventListener('click',()=>setCubeAutoRotation(!grandCube?.auto.enabled));
+document.querySelector('#cubeClose').addEventListener('click',()=>overview());
+
 renderer.domElement.addEventListener('pointerdown',event=>{
+  if(event.button!==0)return;
   const face=pickCubeFace(event);
   if(!face)return;
   event.preventDefault();event.stopImmediatePropagation();
-  grandCube.drag={pointerId:event.pointerId,x:event.clientX,y:event.clientY,moved:false,face};
+  grandCube.drag={pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,x:event.clientX,y:event.clientY,moved:false,face};
   renderer.domElement.setPointerCapture(event.pointerId);
   controls.enabled=false;
   renderer.domElement.style.cursor='grabbing';
@@ -839,9 +943,11 @@ renderer.domElement.addEventListener('pointermove',event=>{
   const drag=grandCube?.drag;
   if(drag && drag.pointerId===event.pointerId){
     const dx=event.clientX-drag.x,dy=event.clientY-drag.y;
-    if(Math.abs(dx)+Math.abs(dy)>2)drag.moved=true;
-    grandCube.rotor.rotation.y+=dx*0.007;
-    grandCube.rotor.rotation.x+=dy*0.007;
+    if(Math.hypot(event.clientX-drag.startX,event.clientY-drag.startY)>8)drag.moved=true;
+    if(drag.moved){
+      grandCube.rotor.rotation.y+=dx*0.007;
+      grandCube.rotor.rotation.x+=dy*0.007;
+    }
     drag.x=event.clientX;drag.y=event.clientY;
     event.preventDefault();event.stopImmediatePropagation();
     return;
@@ -854,14 +960,16 @@ renderer.domElement.addEventListener('pointerup',event=>{
   const drag=grandCube?.drag;
   if(!drag || drag.pointerId!==event.pointerId)return;
   event.preventDefault();event.stopImmediatePropagation();
+  if(Math.hypot(event.clientX-drag.startX,event.clientY-drag.startY)>8)drag.moved=true;
   grandCube.drag=null;
   grandCube.auto.pauseUntil=performance.now()+7000;
-  if(drag.moved){grandCube.auto.yawProgress=0;startCubePhase('toHorizontal',-0.12,1200);}
+  if(drag.moved){grandCube.auto.yawProgress=0;if(!grandCube.focused)startCubePhase('toHorizontal',-0.12,1200);}
   if(renderer.domElement.hasPointerCapture(event.pointerId))renderer.domElement.releasePointerCapture(event.pointerId);
   controls.enabled=!walkMode&&!tourPlaying;
-  setCubeHover(pickCubeFace(event),event);
-  if(!drag.moved) {
-    if(grandCube.focused)visitCubeFloor(drag.face.floor);
+  const releasedFace=pickCubeFace(event);
+  setCubeHover(releasedFace,event);
+  if(!drag.moved && releasedFace===drag.face) {
+    if(grandCube.focused)selectCubeFloor(drag.face.floor);
     else focusGrandCube();
   }
 },{capture:true});
@@ -870,7 +978,7 @@ renderer.domElement.addEventListener('pointercancel',event=>{
   grandCube.drag=null;
   grandCube.auto.pauseUntil=performance.now()+7000;
   grandCube.auto.yawProgress=0;
-  startCubePhase('toHorizontal',-0.12,1200);
+  if(!grandCube.focused)startCubePhase('toHorizontal',-0.12,1200);
   controls.enabled=!walkMode&&!tourPlaying;
   setCubeHover(null);
 },{capture:true});
@@ -1798,6 +1906,7 @@ function updateOpenFeedButton() {
 }
 
 function activateHospital(hospitalId) {
+  setGrandCubeFocused(false);
   setCubeHover(null);
   hideHospitalCubes();
   for(const floor of floors)if(floor){floor.group.visible=false;floor.roof.visible=false;}
@@ -1810,6 +1919,7 @@ function activateHospital(hospitalId) {
     cubesByHospital.set(hospitalId,cube);
   }
   grandCube=cubesByHospital.get(hospitalId);
+  updateCubeInspector();
   floors=state.floors;
   doorHinges=state.doorHinges;
   doorAngles=state.doorAngles;
@@ -2088,7 +2198,7 @@ function stopWalk() {
   document.querySelector('#walk').classList.remove('active');
   document.querySelector('#walk').setAttribute('aria-pressed', 'false');
   document.querySelector('#walk').textContent = 'Walk mode';
-  document.querySelector('#help').textContent = 'Drag to orbit · wheel to zoom · right drag to pan · select a floor and room above';
+  updateControlHelp();
   updateRoofs();
 }
 
@@ -2117,7 +2227,7 @@ async function startWalk() {
   document.querySelector('#walk').classList.add('active');
   document.querySelector('#walk').setAttribute('aria-pressed', 'true');
   document.querySelector('#walk').textContent = 'Exit walk';
-  document.querySelector('#help').textContent = 'Click scene for mouse look · W/A/S/D move · E elevator · [ / ] patient · I inspect tablet · Esc releases mouse';
+  updateControlHelp();
   placeTablet();
   updateRoofs();
 }
@@ -2248,12 +2358,7 @@ document.querySelector('#closeTelemetry').addEventListener('click',()=>{
 });
 document.querySelector('#cubeAuto').addEventListener('click', () => {
   if(!grandCube)return;
-  grandCube.auto.enabled=!grandCube.auto.enabled;
-  grandCube.auto.lastNow=performance.now();
-  const button=document.querySelector('#cubeAuto');
-  button.textContent=grandCube.auto.enabled?'Pause rotation':'Resume rotation';
-  button.setAttribute('aria-pressed',String(grandCube.auto.enabled));
-  button.classList.toggle('active',grandCube.auto.enabled);
+  setCubeAutoRotation(!grandCube.auto.enabled);
 });
 renderer.domElement.addEventListener('click', event => { if (walkMode && !pickCubeFace(event) && document.pointerLockElement !== renderer.domElement) renderer.domElement.requestPointerLock(); });
 document.addEventListener('mousemove', event => {
@@ -2423,6 +2528,7 @@ function animate() {
     if (Math.abs(next - doorAngles[i]) > 0.01) setDoorAngle(i + 1, next);
   }
   updateCubeAuto(now);
+  updateControlHelp();
   if(grandCube) {
     const current=grandCube.group.scale.x;
     if(Math.abs(current-grandCube.targetScale)>0.0005)
