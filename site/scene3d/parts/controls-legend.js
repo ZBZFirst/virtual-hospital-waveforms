@@ -9,7 +9,7 @@ function updateControlHelp(){
   const summaries={
     scene:'Scene · drag to orbit · wheel to zoom · right drag to pan',
     cube:'Nursing cube · drag to rotate · select a floor · Visit Floor to travel',
-    walk:'Walk mode · W/A/S/D move · I opens tablet and frees cursor · Esc releases mouse',
+    walk:'Walk mode · W/A/S/D move · tablet speakers 1–7 · 0 mutes all',
     tour:'Unit walk tour · Play or pause · drag timeline to seek',
     patient:'Patient room · use Patient for recordings and room controls',
   };

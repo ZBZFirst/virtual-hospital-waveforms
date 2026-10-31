@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, 'scene3d/parts/screens-and-tablet.js'), 'utf8');
-const fills = [];
+const fills = [], layouts = [], audioControls = [];
 const context2d = {
   fillRect(...args) { fills.push(args); },
   fillText() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {},
@@ -15,38 +15,37 @@ const tablet = {
   canvas: { width: 1024, height: 768, getContext: () => context2d },
   texture: { needsUpdate: false }, drawCount: 0,
 };
-const channels = ['ecg lead ii', 'art', 'cvp', 'pap'].map(key => ({ key, label: key, unit: 'mV', min: -2, max: 2, color: '#fff' }));
-const record = {
-  id: 'mgh001', parts: {}, samples: 10000, fs: 100, count: 4, windows: new Int32Array(800),
-  channels: Object.fromEntries(channels.map((channel, index) => [channel.key, { index, baseline: 0, gain: 100 }])),
-};
+const records = [{id:'mgh001'}, {id:'mgh002'}];
+const vents = [{recording:'vent001'}, {recording:'vent002'}];
 const rooms = [{ id: 'A-F01-R01', patient_id: 'SIM-A-F01-R01', telemetry_record: 'mgh001' },
   { id: 'A-F01-R02', patient_id: 'SIM-A-F01-R02', telemetry_record: 'mgh001' }];
 const context = {
   tablet, tabletRoom: 1, activeHospital: 'A', activeFloor: 1,
-  floorRecords: [[record, record]], channels,
+  floorRecords: [records],
   roomAssignment: (_hospital, _floor, room) => rooms[room - 1],
-  ventRecordForRoom: () => null,
-  isCached: () => true,
-  recordClock: (item, elapsed) => Math.floor(elapsed * item.fs),
-  decodeWindowSample: sample => 100 + 40 * Math.sin(sample / 10),
-  drawTabletAudioControls: () => {},
-  THREE: { MathUtils: { clamp: (value, low, high) => Math.max(low, Math.min(high, value)) } },
+  ventRecordForRoom: room => vents[room-1],
+  drawMonitorLayout: (_canvas, layout, sources, elapsed, area) => layouts.push({layout,sources,elapsed,area}),
+  drawTabletAudioControls: (_canvas, sources) => audioControls.push(sources),
 };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync('scene3d/parts/monitor-system.js','utf8'),context);
 vm.runInContext(source.slice(source.indexOf('function drawTablet(')), context);
 const fullClears = () => fills.filter(([x, y, width, height]) => x === 0 && y === 0 && width === 1024 && height === 768).length;
 
 context.drawTablet(0);
 assert.equal(fullClears(), 1);
 context.drawTablet(0.25);
-assert.equal(tablet.lastStep, 25);
-assert.equal(fullClears(), 1, 'completed columns must remain on the canvas');
-record.parts = { next: true };
+assert.equal(fullClears(), 2, 'the tablet redraws the shared live monitor window');
+assert.equal(layouts[1].layout,'unit');
+assert.equal(layouts[1].sources.vital,records[0]);
+assert.equal(layouts[1].sources.vent,vents[0], 'tablet and room monitor use the same ventilator record');
+assert.equal(layouts[1].elapsed,0.25);
+assert.equal(layouts[1].area.width,1000);
+assert.equal(audioControls[1].vent,vents[0]);
 context.drawTablet(8.25);
-assert.equal(fullClears(), 1, 'cache renewal and sweep wrap must not clear the trace');
+assert.equal(fullClears(), 3);
 context.tabletRoom = 2;
 context.drawTablet(8.5);
-assert.equal(fullClears(), 2, 'a different room starts a fresh trace');
-console.log('Tablet sweep preserves completed trace columns');
+assert.equal(layouts[3].sources.vital,records[1]);
+assert.equal(layouts[3].sources.vent,vents[1]);
+assert.equal(layouts[3].sources.assignment,rooms[1]);
+console.log('Tablet redraws the shared seven-channel monitor layout from the selected room sources');

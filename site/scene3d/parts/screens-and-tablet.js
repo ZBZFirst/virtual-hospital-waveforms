@@ -112,86 +112,21 @@ function placeTablet() {
 function drawTablet(elapsed) {
   if (!tablet?.group.visible) return;
   const { canvas, texture } = tablet, c = canvas.getContext('2d');
-  const room = tabletRoom, vital = floorRecords[activeFloor - 1]?.[room - 1];
+  const room = tabletRoom, vital = floorRecords[activeFloor - 1]?.[room - 1] || null;
   const assignment=roomAssignment(activeHospital,activeFloor,room);
   const vent = ventRecordForRoom(room);
-  const chartX = 196, chartW = 803, rowH = 87, rowStart=110;
-  const stepRate = 100;
-  const signature = `${assignment?.id}:${vital?.id || ''}:${Boolean(vital?.parts)}:${Boolean(vent)}`;
-  if (tablet.signature !== signature || elapsed < tablet.sweepStart) {
-    tablet.signature = signature;
-    tablet.sweepStart = elapsed;
-    tablet.lastStep = -1;
-    tablet.lastPoints = Array(7).fill(null);
-    tablet.ranges = [];
-    c.fillStyle = '#07181e'; c.fillRect(0, 0, canvas.width, canvas.height);
-    c.fillStyle = '#d8eef0'; c.font = 'bold 27px system-ui';
-    c.fillText(`${activeHospital}-F${String(activeFloor).padStart(2,'0')}-R${String(room).padStart(2,'0')}`, 22, 34);
-    c.fillStyle = '#82aab2'; c.font = '16px system-ui';
-    c.fillText(assignment?.telemetry_record?'VITAL SIGNS · complete MGH recording':assignment?.patient_id?'VITAL SIGNS · NO SOURCE':'VITAL SIGNS · UNASSIGNED', 22, 58);
-    c.fillText(assignment?.uc_davis_recording?'VENTILATOR · UC Davis full source visual track':assignment?.patient_id?'VENTILATOR · NO SOURCE':'VENTILATOR · UNASSIGNED', 510, 58);
-    for (let row = 0; row < 7; row++) {
-      const y = rowStart + row * rowH, channel = monitorChannels[monitorLayouts.unit[row]];
-      const channelState=monitorChannelState(monitorLayouts.unit[row],{vital,vent,assignment},elapsed);
-      const range=channelState.range;
-      tablet.ranges.push(range);
-      const color = channel.color;
-      const label = `${channel.label}  ${channel.unit}`;
-      c.fillStyle = row % 2 ? '#10252c' : '#0d2027'; c.fillRect(12, y, 1000, rowH - 3);
-      c.strokeStyle = '#28505a'; c.lineWidth = 1;
-      for (let tick = 0; tick < 5; tick++) {
-        const x = chartX + tick * chartW / 4;
-        c.beginPath(); c.moveTo(x, y + 4); c.lineTo(x, y + rowH - 8); c.stroke();
-      }
-      c.fillStyle = color; c.font = 'bold 20px system-ui'; c.fillText(label, 23, y + 32);
-      c.fillStyle = '#89a9af'; c.font = '15px system-ui'; c.fillText(`${range[0].toFixed(0)} to ${range[1].toFixed(0)}`, 23, y + 58);
-      const available=!channelState.status;
-      if (!available) {
-        c.fillStyle = '#79939b';
-        c.fillText(channelState.status, chartX + 12, y + 52);
-      }
-    }
-    c.fillStyle = '#96bbc2'; c.font = '15px system-ui';
-    c.fillText(`${vital?.id?.toUpperCase() || 'MGH loading'} · patient ${room}/6 · [ / ] cycle · speakers follow source samples`, 22, 753);
-    texture.needsUpdate = true;
-  }
+  const sources={vital,vent,assignment};
+  c.fillStyle='#07181e';c.fillRect(0,0,canvas.width,canvas.height);
+  c.fillStyle='#d8eef0';c.font='bold 27px system-ui';
+  c.fillText(`${activeHospital}-F${String(activeFloor).padStart(2,'0')}-R${String(room).padStart(2,'0')}`,22,34);
+  c.fillStyle='#82aab2';c.font='16px system-ui';
+  c.fillText(assignment?.telemetry_record?'VITAL SIGNS · complete MGH recording':assignment?.patient_id?'VITAL SIGNS · NO SOURCE':'VITAL SIGNS · UNASSIGNED',22,58);
+  c.fillText(assignment?.uc_davis_recording?'VENTILATOR · UC Davis full source visual track':assignment?.patient_id?'VENTILATOR · NO SOURCE':'VENTILATOR · UNASSIGNED',510,58);
+  drawMonitorLayout(c,'unit',sources,elapsed,{x:12,y:120,width:1000,height:609});
   drawTabletAudioControls(c,{vital,vent,assignment},elapsed);
+  c.fillStyle='#96bbc2';c.font='15px system-ui';
+  c.fillText(`${vital?.id?.toUpperCase() || 'MGH loading'} · patient ${room}/6 · [ / ] cycle · 1–7 speakers · 0 mute all`,22,753);
   texture.needsUpdate=true;
-  if (assignment?.telemetry_record && (!vital || !isCached(vital, elapsed))) return;
-  const currentStep = Math.floor((elapsed - tablet.sweepStart) * stepRate);
-  if (currentStep - tablet.lastStep > chartW) tablet.lastStep = currentStep - chartW;
-  for (let step = tablet.lastStep + 1; step <= currentStep; step++) {
-    const x = step % chartW, t = tablet.sweepStart + step / stepRate;
-    for (let row = 0; row < 7; row++) {
-      const y = rowStart + row * rowH, channel = monitorChannels[monitorLayouts.unit[row]];
-      const key = channel.key;
-      const available = row < 4 ? Boolean(vital?.parts && vital.channels[key]) : Boolean(vent && Array.isArray(vent[key]));
-      if (!available) continue;
-      c.fillStyle = row % 2 ? '#10252c' : '#0d2027';
-      c.fillRect(chartX + x, y + 4, 2, rowH - 12);
-      if ([0, 1, 2, 3, 4].some(tick => Math.abs(x - Math.round(tick * chartW / 4)) < 2)) {
-        c.strokeStyle = '#28505a'; c.lineWidth = 1;
-        c.beginPath(); c.moveTo(chartX + x, y + 4); c.lineTo(chartX + x, y + rowH - 8); c.stroke();
-      }
-      const span=monitorSampleSpan(monitorLayouts.unit[row],{vital,vent,assignment},t-1/stepRate,t,elapsed);
-      if (!span) { tablet.lastPoints[row] = null; continue; }
-      const [lo,hi]=span;
-      const [min, max] = tablet.ranges[row];
-      const plot = value => y + rowH - 12 - THREE.MathUtils.clamp((value - min) / (max - min || 1), 0, 1) * (rowH - 24);
-      const py = plot((lo + hi) / 2);
-      c.strokeStyle = channel.color;
-      c.lineWidth = 2; c.beginPath();
-      const previous = tablet.lastPoints[row];
-      if (previous && previous.step === step - 1 && x > 0) c.moveTo(chartX + x - 1, previous.py);
-      else c.moveTo(chartX + x, py);
-      c.lineTo(chartX + x, py);
-      if (lo !== hi) { c.moveTo(chartX + x, plot(lo)); c.lineTo(chartX + x, plot(hi)); }
-      c.stroke();
-      tablet.lastPoints[row] = { step, py };
-    }
-  }
-  if (currentStep > tablet.lastStep) texture.needsUpdate = true;
-  tablet.lastStep = currentStep;
   tablet.lastDrawElapsed = elapsed;
   tablet.drawCount++;
 }

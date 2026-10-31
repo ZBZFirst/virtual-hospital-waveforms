@@ -157,6 +157,7 @@ document.addEventListener('keydown', event => {
     if(key==='escape'){document.querySelector('#closeTelemetry').click();event.preventDefault();}
     return;
   }
+  if(handleTabletAudioKey(event)){event.preventDefault();return;}
   if (walkMode && ['w', 'a', 's', 'd', 'shift'].includes(key)) { movementKeys.add(key); event.preventDefault(); }
   if (walkMode && key === 'e' && !event.repeat) { toggleElevatorDoor(); event.preventDefault(); }
   if (walkMode && key === 'i' && !event.repeat) { document.querySelector('#inspectTarget').click(); event.preventDefault(); }

@@ -2,7 +2,7 @@
 // same channel sampler and fixed chart range used to draw its waveform.
 const tabletAudioVoices=new Map();
 let tabletAudioContext=null,tabletAudioMaster=null,tabletAudioGeneration=0;
-const tabletAudioButtons=monitorLayouts.unit.map((channel,index)=>({channel,x:20+index*115,y:69,width:109,height:31}));
+const tabletAudioButtons=monitorLayouts.unit.map((channel,index)=>({channel,key:String(index+1),x:20+index*115,y:69,width:109,height:31}));
 const tabletMuteButton={x:850,y:69,width:152,height:31};
 
 function muteTabletAudio(){
@@ -84,11 +84,21 @@ function drawTabletAudioControls(c,sources,elapsed){
     c.fillRect(button.x,button.y,button.width,button.height);
     c.strokeStyle=on?'#8ff1cc':'#5a8997';c.strokeRect(button.x+.5,button.y+.5,button.width-1,button.height-1);
     c.fillStyle=state.status?'#78959c':'#e6f5f7';c.font='bold 15px system-ui';
-    c.fillText(`${on?'🔊':'🔇'} ${monitorChannels[button.channel].label}`,button.x+6,button.y+21);
+    c.fillText(`${button.key} ${on?'🔊':'🔇'} ${monitorChannels[button.channel].label}`,button.x+6,button.y+21);
   }
   c.fillStyle='#244450';c.fillRect(tabletMuteButton.x,tabletMuteButton.y,tabletMuteButton.width,tabletMuteButton.height);
   c.strokeStyle='#5a8997';c.strokeRect(tabletMuteButton.x+.5,tabletMuteButton.y+.5,tabletMuteButton.width-1,tabletMuteButton.height-1);
-  c.fillStyle='#e6f5f7';c.font='bold 16px system-ui';c.fillText('Mute All',tabletMuteButton.x+31,tabletMuteButton.y+21);
+  c.fillStyle='#e6f5f7';c.font='bold 16px system-ui';c.fillText('0 Mute All',tabletMuteButton.x+26,tabletMuteButton.y+21);
+}
+
+function handleTabletAudioKey(event){
+  if(!walkMode||!tabletEquipped||event.repeat||event.altKey||event.ctrlKey||event.metaKey||
+      event.target?.closest?.('input, textarea, select, [contenteditable="true"]'))return false;
+  if(event.key==='0'){muteTabletAudio();return true;}
+  const button=tabletAudioButtons.find(item=>item.key===event.key);
+  if(!button)return false;
+  toggleTabletChannelAudio(button.channel).catch(error=>showError(`Tablet sound unavailable: ${error.message}`));
+  return true;
 }
 
 const tabletAudioRaycaster=new THREE.Raycaster();

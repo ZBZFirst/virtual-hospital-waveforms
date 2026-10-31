@@ -60,29 +60,6 @@ function monitorChannelState(channelId, sources, elapsed) {
   return {channel,range,status:null,count:250,sample:index=>values[start+index]};
 }
 
-function monitorSampleSpan(channelId,sources,fromSeconds,toSeconds,elapsed) {
-  const state=monitorChannelState(channelId,sources,elapsed);
-  if(state.status)return null;
-  const channel=state.channel,record=sources[channel.source];
-  if(channel.source==='vent'){
-    const index=record.external?
-      Math.max(0,Math.min(249,Math.floor(249-(elapsed-toSeconds)*50))):
-      Math.min(499,Math.floor((toSeconds%10)*50));
-    const value=record[channel.key][index];
-    return Number.isFinite(value)?[value,value]:null;
-  }
-  const info=record.channels[channel.key];
-  let low=Infinity,high=-Infinity;
-  for(let clock=recordClock(record,fromSeconds);clock<=recordClock(record,toSeconds);clock++){
-    const sample=((clock%record.samples)+record.samples)%record.samples;
-    const digital=decodeWindowSample(sample,info.index,record.count,record.parts);
-    if(digital===null)continue;
-    const value=(digital-info.baseline)/info.gain;
-    low=Math.min(low,value);high=Math.max(high,value);
-  }
-  return Number.isFinite(low)?[low,high]:null;
-}
-
 function drawMonitorChannel(c, state, box, options={}) {
   const {x,y,width,height}=box,compact=Boolean(options.compact),plotX=x+(compact?91:140),plotW=width-(compact?101:154);
   const {channel,range}=state;
