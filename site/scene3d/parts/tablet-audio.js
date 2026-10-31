@@ -92,12 +92,16 @@ function drawTabletAudioControls(c,sources,elapsed){
 }
 
 const tabletAudioRaycaster=new THREE.Raycaster();
-function handleTabletAudioClick(event){
-  if(!walkMode||!tabletInspect||!tabletEquipped||!tablet?.display||document.pointerLockElement===renderer.domElement)return false;
+function tabletDisplayHit(event){
+  if(!walkMode||!tabletInspect||!tabletEquipped||!tablet?.display)return null;
   const bounds=renderer.domElement.getBoundingClientRect();
   const pointer=new THREE.Vector2((event.clientX-bounds.left)/bounds.width*2-1,-(event.clientY-bounds.top)/bounds.height*2+1);
   tabletAudioRaycaster.setFromCamera(pointer,camera);
-  const hit=tabletAudioRaycaster.intersectObject(tablet.display)[0];
+  return tabletAudioRaycaster.intersectObject(tablet.display)[0]||null;
+}
+function handleTabletAudioClick(event){
+  if(document.pointerLockElement===renderer.domElement)return false;
+  const hit=tabletDisplayHit(event);
   if(!hit?.uv)return false;
   const x=hit.uv.x*tablet.canvas.width,y=(1-hit.uv.y)*tablet.canvas.height;
   if(y>=tabletMuteButton.y&&y<=tabletMuteButton.y+tabletMuteButton.height&&x>=tabletMuteButton.x&&x<=tabletMuteButton.x+tabletMuteButton.width){

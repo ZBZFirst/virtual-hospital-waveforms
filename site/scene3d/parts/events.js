@@ -57,7 +57,11 @@ setupToolbarTabsAndDrag();
 enablePanelDrag(document.querySelector('#cubeInspector'),document.querySelector('#cubeDragHandle'));
 document.querySelector('#walk').addEventListener('click', () => walkMode ? stopWalk() : startWalk());
 document.querySelector('#inspectTarget').addEventListener('click', () => {
-  if(walkMode){tabletInspect=!tabletInspect;placeTablet();}
+  if(walkMode){
+    tabletInspect=!tabletInspect;
+    if(tabletInspect&&document.pointerLockElement===renderer.domElement)document.exitPointerLock();
+    placeTablet();
+  }
   else focusGrandCube();
 });
 async function changePatient(step){
@@ -134,7 +138,13 @@ document.querySelector('#cubeAuto').addEventListener('click', () => {
   if(!grandCube)return;
   setCubeAutoRotation(!grandCube.auto.enabled);
 });
-renderer.domElement.addEventListener('click', event => { if (walkMode && !handleTabletAudioClick(event) && !pickCubeFace(event) && document.pointerLockElement !== renderer.domElement) renderer.domElement.requestPointerLock(); });
+renderer.domElement.addEventListener('click', event => {
+  if(!walkMode)return;
+  if(tabletInspect&&document.pointerLockElement===renderer.domElement){document.exitPointerLock();return;}
+  if(handleTabletAudioClick(event)||tabletDisplayHit(event)||pickCubeFace(event))return;
+  if(event.pointerType==='touch')return;
+  if(document.pointerLockElement!==renderer.domElement)renderer.domElement.requestPointerLock();
+});
 document.addEventListener('mousemove', event => {
   if (!walkMode || document.pointerLockElement !== renderer.domElement) return;
   camera.rotation.y -= event.movementX * 0.002;

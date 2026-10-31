@@ -569,12 +569,16 @@ function drawTabletAudioControls(c,sources,elapsed){
 }
 
 const tabletAudioRaycaster=new THREE.Raycaster();
-function handleTabletAudioClick(event){
-  if(!walkMode||!tabletInspect||!tabletEquipped||!tablet?.display||document.pointerLockElement===renderer.domElement)return false;
+function tabletDisplayHit(event){
+  if(!walkMode||!tabletInspect||!tabletEquipped||!tablet?.display)return null;
   const bounds=renderer.domElement.getBoundingClientRect();
   const pointer=new THREE.Vector2((event.clientX-bounds.left)/bounds.width*2-1,-(event.clientY-bounds.top)/bounds.height*2+1);
   tabletAudioRaycaster.setFromCamera(pointer,camera);
-  const hit=tabletAudioRaycaster.intersectObject(tablet.display)[0];
+  return tabletAudioRaycaster.intersectObject(tablet.display)[0]||null;
+}
+function handleTabletAudioClick(event){
+  if(document.pointerLockElement===renderer.domElement)return false;
+  const hit=tabletDisplayHit(event);
   if(!hit?.uv)return false;
   const x=hit.uv.x*tablet.canvas.width,y=(1-hit.uv.y)*tablet.canvas.height;
   if(y>=tabletMuteButton.y&&y<=tabletMuteButton.y+tabletMuteButton.height&&x>=tabletMuteButton.x&&x<=tabletMuteButton.x+tabletMuteButton.width){
@@ -798,7 +802,7 @@ function updateControlHelp(){
   const summaries={
     scene:'Scene · drag to orbit · wheel to zoom · right drag to pan',
     cube:'Nursing cube · drag to rotate · select a floor · Visit Floor to travel',
-    walk:'Walk mode · W/A/S/D move · E elevator · Esc releases mouse',
+    walk:'Walk mode · W/A/S/D move · I opens tablet and frees cursor · Esc releases mouse',
     tour:'Unit walk tour · Play or pause · drag timeline to seek',
     patient:'Patient room · use Patient for recordings and room controls',
   };
@@ -2485,7 +2489,11 @@ setupToolbarTabsAndDrag();
 enablePanelDrag(document.querySelector('#cubeInspector'),document.querySelector('#cubeDragHandle'));
 document.querySelector('#walk').addEventListener('click', () => walkMode ? stopWalk() : startWalk());
 document.querySelector('#inspectTarget').addEventListener('click', () => {
-  if(walkMode){tabletInspect=!tabletInspect;placeTablet();}
+  if(walkMode){
+    tabletInspect=!tabletInspect;
+    if(tabletInspect&&document.pointerLockElement===renderer.domElement)document.exitPointerLock();
+    placeTablet();
+  }
   else focusGrandCube();
 });
 async function changePatient(step){
@@ -2562,7 +2570,13 @@ document.querySelector('#cubeAuto').addEventListener('click', () => {
   if(!grandCube)return;
   setCubeAutoRotation(!grandCube.auto.enabled);
 });
-renderer.domElement.addEventListener('click', event => { if (walkMode && !handleTabletAudioClick(event) && !pickCubeFace(event) && document.pointerLockElement !== renderer.domElement) renderer.domElement.requestPointerLock(); });
+renderer.domElement.addEventListener('click', event => {
+  if(!walkMode)return;
+  if(tabletInspect&&document.pointerLockElement===renderer.domElement){document.exitPointerLock();return;}
+  if(handleTabletAudioClick(event)||tabletDisplayHit(event)||pickCubeFace(event))return;
+  if(event.pointerType==='touch')return;
+  if(document.pointerLockElement!==renderer.domElement)renderer.domElement.requestPointerLock();
+});
 document.addEventListener('mousemove', event => {
   if (!walkMode || document.pointerLockElement !== renderer.domElement) return;
   camera.rotation.y -= event.movementX * 0.002;
