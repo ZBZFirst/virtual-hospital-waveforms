@@ -9,7 +9,7 @@ try {
   await new Promise((resolve, reject) => {
     const script = document.createElement('script');
     const url = new URL('./scene-runtime.js', import.meta.url);
-    url.searchParams.set('v', '20261031-static-trace-names1');
+    url.searchParams.set('v', '20261031-glb-traces-removed1');
     script.src = url.href;
     script.onload = resolve;
     script.onerror = () => reject(new Error('Could not load scene runtime'));

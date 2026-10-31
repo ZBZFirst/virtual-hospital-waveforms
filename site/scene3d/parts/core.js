@@ -132,7 +132,11 @@ const floorHeight = 3.2;
 const recordings = new Map();
 let telemetryBase = '';
 let modelBase = '';
-const modelUrl = path => new URL(path, modelBase).href;
+const modelUrl = path => {
+  const url=new URL(path,modelBase);
+  if(path==='ward_floor_02.glb')url.searchParams.set('v','20261031-glb-traces-removed1');
+  return url.href;
+};
 let telemetryDetail = null, lastDetailPaint = 0;
 const playbackStart = performance.now();
 let telemetryReady = Array(6).fill(false);

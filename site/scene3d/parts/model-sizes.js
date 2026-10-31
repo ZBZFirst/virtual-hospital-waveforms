@@ -1,1 +1,1 @@
-const modelBytes = Object.freeze({"elevator_cab.glb":17400,"hospital_shell.glb":138124,"patient_lods/patient_001_lod1.glb":1034948,"patient_lods/patient_001_lod2.glb":129096,"roof_floor_02.glb":6548,"ward_floor_02.glb":3482640});
+const modelBytes = Object.freeze({"elevator_cab.glb":17400,"hospital_shell.glb":138124,"patient_lods/patient_001_lod1.glb":1034948,"patient_lods/patient_001_lod2.glb":129096,"roof_floor_02.glb":6548,"ward_floor_02.glb":3482556});

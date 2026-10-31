@@ -15,7 +15,7 @@
   <div id="captureStage">
   <main class="atlas-screen" aria-label="3D virtual hospitals">
     <canvas id="atlas" aria-hidden="true"></canvas>
-    <iframe id="hospitalScene" title="Interactive 3D virtual hospitals" src="scene3d/?view=hospital&amp;embedded=1&amp;v=20261031-static-trace-names1" loading="eager"></iframe>
+    <iframe id="hospitalScene" title="Interactive 3D virtual hospitals" src="scene3d/?view=hospital&amp;embedded=1&amp;v=20261031-glb-traces-removed1" loading="eager"></iframe>
     <div id="sceneLoading" class="scene-loading" role="status" aria-live="polite">
       <div class="scene-loading-card"><span class="scene-spinner" aria-hidden="true"></span><strong id="sceneLoadingTitle">Loading 3D hospitals…</strong><p id="sceneLoadingMessage">Preparing the hospital scene…</p><progress id="sceneLoadingProgress" max="100" value="0" aria-label="3D scene build progress"></progress><output id="sceneLoadingAmount" aria-live="off">0% · preparing scene assets…</output><button id="retryScene" type="button" hidden>Reload scene</button></div>
     </div>
@@ -139,7 +139,7 @@
   <script src="grid-monitor.js?v=20261021-finite-feeds" defer></script>
   <script src="unit-cubes.js?v=20261021-finite-feeds" defer></script>
   <script src="streamer-mask.js?v=20261030-shared-floor2" defer></script>
-  <script src="page-runtime.js?v=20261031-static-trace-names1" defer></script>
+  <script src="page-runtime.js?v=20261031-glb-traces-removed1" defer></script>
   <dialog id="room-about"><form method="dialog"><button aria-label="Close">Close</button></form><h2>Room waveform perspectives</h2><p>ZeBeZo cards show observational measures calculated from loaded 50 Hz samples after a completed BS/BE breath. Hahnicity cards show experimental JavaScript ports of selected ventMAP metadata, ventparliament mechanics, and PVA heuristic calculations. They run in this browser; Python repository functions are not executed on the server. A card can lag while analysis runs. Neither perspective changes waveform playback. This is not a clinical tool.</p></dialog>
 </body>
 </html>
