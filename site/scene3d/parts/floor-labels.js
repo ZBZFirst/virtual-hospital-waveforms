@@ -36,6 +36,17 @@ function floorLabelTexture(lines){
   return texture;
 }
 
+function makeFloorLabelMesh(name,lines,width,height){
+  const texture=floorLabelTexture(lines);
+  const material=new THREE.MeshBasicMaterial({map:texture,side:THREE.DoubleSide,
+    transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1});
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(width,height),material);
+  mesh.name=`Floor label · ${name}`;
+  mesh.rotation.x=-Math.PI/2;
+  mesh.userData.floorLabel=name;
+  return mesh;
+}
+
 function makeFloorLabels(hospitalId,level){
   const group=new THREE.Group();
   group.name=`Hospital ${hospitalId} Floor ${level} floor labels`;
@@ -46,15 +57,22 @@ function makeFloorLabels(hospitalId,level){
     ...floorLabelSpaces.map(space=>({...space,lines:[space.name]})),
   ];
   for(const space of spaces){
-    const texture=floorLabelTexture(space.lines);
-    const material=new THREE.MeshBasicMaterial({map:texture,side:THREE.DoubleSide,
-      transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1});
-    const mesh=new THREE.Mesh(new THREE.PlaneGeometry(space.width,space.height),material);
-    mesh.name=`Floor label · ${space.name}`;
-    mesh.rotation.x=-Math.PI/2;
+    const mesh=makeFloorLabelMesh(space.name,space.lines,space.width,space.height);
     mesh.position.set((space.x-450)/25,top,(space.y-320)/25);
-    mesh.userData.floorLabel=space.name;
     group.add(mesh);
   }
   return group;
+}
+
+function labelElevatorCab(cabGroup){
+  let platform=null;
+  cabGroup.traverse(object=>{
+    if(object.isMesh && /Elevator[_ ]cab[_ ]platform/i.test(object.name))platform=object;
+  });
+  if(!platform)throw Error('Elevator cab platform missing from model');
+  const label=makeFloorLabelMesh('Elevator cab',['Elevator'],2.8,.75);
+  // The platform mesh spans -0.07 to +0.07 in local Y.
+  label.position.set(0,.09,0);
+  platform.add(label);
+  return label;
 }

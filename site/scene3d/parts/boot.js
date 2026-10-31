@@ -32,6 +32,7 @@ async function boot() {
   scene.add(hospitalShell);
   activateHospital('A');
   cabGroup = elevatorAsset.scene;
+  labelElevatorCab(cabGroup);
   scene.add(cabGroup);
   document.querySelector('#cubeAuto').classList.add('active');
   camera.position.set(22, 35, 31);

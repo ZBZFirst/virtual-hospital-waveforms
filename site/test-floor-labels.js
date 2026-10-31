@@ -5,8 +5,9 @@ const vm=require('node:vm');
 const plan=require('./floor-plan.js');
 
 class Group{constructor(){this.children=[];}add(child){this.children.push(child);}}
-class Mesh{constructor(geometry,material){this.geometry=geometry;this.material=material;
-  this.position={set:(x,y,z)=>{Object.assign(this.position,{x,y,z});}};this.rotation={};this.userData={};}}
+class Mesh{constructor(geometry,material){this.geometry=geometry;this.material=material;this.children=[];this.isMesh=true;
+  this.position={set:(x,y,z)=>{Object.assign(this.position,{x,y,z});}};this.rotation={};this.userData={};}
+  add(child){this.children.push(child);child.parent=this;}}
 class Material{constructor(options){Object.assign(this,options);}}
 class Texture{constructor(canvas){this.image=canvas;}}
 const written=[];
@@ -40,4 +41,14 @@ assert.equal(a1.children[1].material.map,b6.children[1].material.map,
   'generic room art is reused across floors');
 assert.notEqual(a1.children[0].material.map,b6.children[0].material.map,
   'hospital and floor art is specific to each unit');
-console.log('All ten floor labels align with the shared unit spaces');
+const platform=new Mesh(null,null);
+platform.name='Elevator_cab_platform';
+platform.position.set(0,.08,0);
+const cab={traverse:visit=>visit(platform)};
+const cabLabel=context.labelElevatorCab(cab);
+assert.equal(cabLabel.parent,platform,'the label rides on the moving cab platform');
+assert.equal(cabLabel.position.y,.09);
+assert(platform.position.y+cabLabel.position.y>.15,'label sits above the platform surface');
+assert.equal(cabLabel.material.map,a1.children[9].material.map,
+  'landing and cab use the same Elevator art');
+console.log('Unit labels align with their spaces and Elevator art rides on the cab');
