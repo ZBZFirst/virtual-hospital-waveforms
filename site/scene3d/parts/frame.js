@@ -63,8 +63,10 @@ function animate() {
         if (distance < nearest) { nearest = distance; room = i + 1; }
       });
       const nextWalkRoom=nearest<7?room:0;
+      if(nextWalkRoom!==walkRoom)muteTabletAudio();
       if(nextWalkRoom!==walkRoom){walkRoom=nextWalkRoom;updateOpenFeedButton();updateToolbarSelection();}
       if (!tabletManualRoom && nearest < 7 && tabletRoom !== room) {
+        muteTabletAudio();
         tabletRoom = room;
         document.querySelectorAll('[data-room]').forEach(item => item.classList.toggle('active', Number(item.dataset.room) === tabletRoom));
       }
@@ -85,6 +87,7 @@ function animate() {
     drawTelemetryFrame(now, seconds, frustum);
     drawVentilatorsFrame(seconds, frustum);
     drawTablet(seconds);
+    syncTabletAudio(seconds);
     drawCubeFaces(seconds, now, frustum);
     lastFeedPaint = now;
   }

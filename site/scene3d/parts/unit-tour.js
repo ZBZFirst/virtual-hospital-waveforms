@@ -147,6 +147,7 @@ function stopTour(restoreDoors = true) {
 
 function stopWalk() {
   if (!walkMode) return;
+  muteTabletAudio();
   walkMode = false;
   walkRoom=0;
   tabletInspect = false;

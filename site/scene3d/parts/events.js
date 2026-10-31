@@ -134,7 +134,7 @@ document.querySelector('#cubeAuto').addEventListener('click', () => {
   if(!grandCube)return;
   setCubeAutoRotation(!grandCube.auto.enabled);
 });
-renderer.domElement.addEventListener('click', event => { if (walkMode && !pickCubeFace(event) && document.pointerLockElement !== renderer.domElement) renderer.domElement.requestPointerLock(); });
+renderer.domElement.addEventListener('click', event => { if (walkMode && !handleTabletAudioClick(event) && !pickCubeFace(event) && document.pointerLockElement !== renderer.domElement) renderer.domElement.requestPointerLock(); });
 document.addEventListener('mousemove', event => {
   if (!walkMode || document.pointerLockElement !== renderer.domElement) return;
   camera.rotation.y -= event.movementX * 0.002;

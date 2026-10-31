@@ -224,7 +224,7 @@ body.streamer-mode[data-stream-orientation="portrait"] .overview-card { grid-col
   .flow-direction { grid-column: 1 / 4; min-width: 0; }
   .flow-direction select { min-width: 0; width: 100%; min-height: 44px; }
   .flow-direction { font-size: 0; }
-  #muteAll { grid-column: 4; font-size: 11px; }
+  .atlas-buttons .flow-direction { grid-column: 1 / -1; }
   .atlas-buttons button { min-height: 44px; padding: 5px; font-size: 12px; }
   .atlas-footer { display: grid; grid-template-columns: 1fr auto; gap: 3px 7px; padding: 7px 12px; font-size: 11px; }
   .atlas-footer .atlas-key,#atlasStatus { display: none; }
@@ -404,7 +404,7 @@ body.streamer-mode[data-stream-orientation="portrait"] .overview-card { grid-col
   .atlas-actions .dataset-stats { margin: 0 0 14px; white-space: normal; line-height: 1.45; }
   .atlas-buttons { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; margin: 0; }
   .atlas-buttons button { min-height: 48px; white-space: normal; }
-  .atlas-buttons #muteAll,.atlas-buttons #openBedManager,.atlas-buttons #openDirectory,.atlas-buttons #resetAtlas { grid-column: 1 / -1; }
+  .atlas-buttons #openBedManager,.atlas-buttons #openDirectory,.atlas-buttons #resetAtlas { grid-column: 1 / -1; }
   .atlas-buttons #openHospitals { grid-column: 1; }
   .atlas-buttons #open3DHospitals { grid-column: 2; }
   .atlas-buttons #zoomOut { grid-column: 1; }

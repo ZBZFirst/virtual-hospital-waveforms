@@ -84,11 +84,13 @@ function makeTablet() {
   group.add(shell, display);
   camera.add(group);
   group.visible = false;
-  return { group, canvas, texture, drawCount: 0 };
+  return { group, display, canvas, texture, drawCount: 0 };
 }
 
 function selectTabletRoom(room) {
-  tabletRoom = ((room - 1 + 6) % 6) + 1;
+  const next=((room - 1 + 6) % 6) + 1;
+  if(next!==tabletRoom)muteTabletAudio();
+  tabletRoom = next;
   tabletManualRoom = true;
   document.querySelectorAll('[data-room]').forEach(item => item.classList.toggle('active', Number(item.dataset.room) === tabletRoom));
 }
@@ -113,7 +115,7 @@ function drawTablet(elapsed) {
   const room = tabletRoom, vital = floorRecords[activeFloor - 1]?.[room - 1];
   const assignment=roomAssignment(activeHospital,activeFloor,room);
   const vent = ventRecordForRoom(room);
-  const chartX = 196, chartW = 803, rowH = 94;
+  const chartX = 196, chartW = 803, rowH = 87, rowStart=110;
   const stepRate = 100;
   const signature = `${assignment?.id}:${vital?.id || ''}:${Boolean(vital?.parts)}:${Boolean(vent)}`;
   if (tablet.signature !== signature || elapsed < tablet.sweepStart) {
@@ -129,7 +131,7 @@ function drawTablet(elapsed) {
     c.fillText(assignment?.telemetry_record?'VITAL SIGNS · complete MGH recording':assignment?.patient_id?'VITAL SIGNS · NO SOURCE':'VITAL SIGNS · UNASSIGNED', 22, 58);
     c.fillText(assignment?.uc_davis_recording?'VENTILATOR · UC Davis full source visual track':assignment?.patient_id?'VENTILATOR · NO SOURCE':'VENTILATOR · UNASSIGNED', 510, 58);
     for (let row = 0; row < 7; row++) {
-      const y = 75 + row * rowH, channel = monitorChannels[monitorLayouts.unit[row]];
+      const y = rowStart + row * rowH, channel = monitorChannels[monitorLayouts.unit[row]];
       const channelState=monitorChannelState(monitorLayouts.unit[row],{vital,vent,assignment},elapsed);
       const range=channelState.range;
       tablet.ranges.push(range);
@@ -150,16 +152,18 @@ function drawTablet(elapsed) {
       }
     }
     c.fillStyle = '#96bbc2'; c.font = '15px system-ui';
-    c.fillText(`${vital?.id?.toUpperCase() || 'MGH loading'} · patient ${room}/6 · [ / ] cycle · feeds loop independently`, 22, 753);
+    c.fillText(`${vital?.id?.toUpperCase() || 'MGH loading'} · patient ${room}/6 · [ / ] cycle · speakers follow source samples`, 22, 753);
     texture.needsUpdate = true;
   }
+  drawTabletAudioControls(c,{vital,vent,assignment},elapsed);
+  texture.needsUpdate=true;
   if (assignment?.telemetry_record && (!vital || !isCached(vital, elapsed))) return;
   const currentStep = Math.floor((elapsed - tablet.sweepStart) * stepRate);
   if (currentStep - tablet.lastStep > chartW) tablet.lastStep = currentStep - chartW;
   for (let step = tablet.lastStep + 1; step <= currentStep; step++) {
     const x = step % chartW, t = tablet.sweepStart + step / stepRate;
     for (let row = 0; row < 7; row++) {
-      const y = 75 + row * rowH, channel = monitorChannels[monitorLayouts.unit[row]];
+      const y = rowStart + row * rowH, channel = monitorChannels[monitorLayouts.unit[row]];
       const key = channel.key;
       const available = row < 4 ? Boolean(vital?.parts && vital.channels[key]) : Boolean(vent && Array.isArray(vent[key]));
       if (!available) continue;

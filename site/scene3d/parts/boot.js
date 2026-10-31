@@ -84,6 +84,7 @@ window.addEventListener('message',event=>{
     reportSceneStatus(window.wardViewer?'ready':'loading');
     if(window.wardViewer)reportSceneLocation(hospitalView?'campus':expandedHospital?'expanded':'floor');
   }
+  else if(action==='mute-tablet-audio')muteTabletAudio();
   else if(action==='reset')showHospitalView();
   else if(action==='zoom-in' || action==='zoom-out'){
     cameraMove=null;

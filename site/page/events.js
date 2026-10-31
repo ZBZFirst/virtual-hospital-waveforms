@@ -66,7 +66,6 @@ function setupEvents() {
     const url=new URL(els.hospitalScene.src);url.searchParams.set('retry',String(Date.now()));els.hospitalScene.src=url.href;
   };
   els.flowDirection.onchange=()=>{state.reverseFlow=els.flowDirection.value==='reverse';drawAtlas();};
-  els.muteAll.onclick=muteAll;
   $('muteAllDetail').onclick=muteAll;
   els.speaker.onclick=async()=>{
     const entry=state.selected;if(!entry)return;

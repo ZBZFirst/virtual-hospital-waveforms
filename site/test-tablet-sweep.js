@@ -30,6 +30,7 @@ const context = {
   isCached: () => true,
   recordClock: (item, elapsed) => Math.floor(elapsed * item.fs),
   decodeWindowSample: sample => 100 + 40 * Math.sin(sample / 10),
+  drawTabletAudioControls: () => {},
   THREE: { MathUtils: { clamp: (value, low, high) => Math.max(low, Math.min(high, value)) } },
 };
 vm.createContext(context);

@@ -227,6 +227,7 @@ function updateOpenFeedButton() {
 }
 
 function activateHospital(hospitalId) {
+  muteTabletAudio();
   setGrandCubeFocused(false);
   setCubeHover(null);
   hideHospitalCubes();
@@ -263,6 +264,7 @@ async function selectHospital(hospitalId) {
 
 async function setFloor(number, moveCamera = true) {
   if(!meta?.floors[number-1])return;
+  if(number!==activeFloor)muteTabletAudio();
   const token=++floorSelectToken;
   const hospitalId=activeHospital;
   requestedFloor=number;
@@ -324,6 +326,7 @@ function toggleElevatorDoor() {
 }
 
 function setRoom(room) {
+  if(room!==activeRoom)muteTabletAudio();
   leaveHospitalView();
   setGrandCubeFocused(false);
   activeRoom = room;

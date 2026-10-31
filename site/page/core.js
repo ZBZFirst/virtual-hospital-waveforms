@@ -12,7 +12,7 @@ const RECORDING_BASE = LOCAL_ROOM_PREVIEW ? new URL('/recordings/', location.hre
   "https://raw.githubusercontent.com/ZBZFirst/file/32063407e7fffb75d3866d080078d80295de476c/WaveformBackups/";
 const els = {
   atlas: $('atlas'), atlasStatus: $('atlasStatus'), sessionClock: $('sessionClock'),
-  activityStatus: $('activityStatus'), flowDirection: $('flowDirection'), muteAll: $('muteAll'),
+  activityStatus: $('activityStatus'), flowDirection: $('flowDirection'),
   segmentProgressBar: $('segmentProgressBar'), segmentProgressText: $('segmentProgressText'),
   segmentFailures: $('segmentFailures'), segmentFailureList: $('segmentFailureList'), retrySegments: $('retrySegments'),
   hospitalScene: $('hospitalScene'), sceneLoading: $('sceneLoading'), sceneLoadingTitle: $('sceneLoadingTitle'),
@@ -195,7 +195,10 @@ function disableVoice(name){
   voice.oscillator.onended=()=>{voice.oscillator.disconnect();voice.filter.disconnect();voice.gain.disconnect();};
   voiceLevel();updateSpeaker();
 }
-function muteAll(){for(const name of [...state.voices.keys()])disableVoice(name);}
+function muteAll(){
+  for(const name of [...state.voices.keys()])disableVoice(name);
+  els.hospitalScene.contentWindow?.postMessage({type:'zebezo-scene-action',action:'mute-tablet-audio'},location.origin);
+}
 function stopPatientAudio(){
   audioViewGeneration++;
   muteAll();

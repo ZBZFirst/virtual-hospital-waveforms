@@ -474,6 +474,119 @@ function drawMonitorLayout(c, layout, sources, elapsed, area, options={}) {
     {...options,index}));
 }
 
+// Source: scene3d/parts/tablet-audio.js
+// The tablet is the only in-scene sound controller. Each voice follows the
+// same channel sampler and fixed chart range used to draw its waveform.
+const tabletAudioVoices=new Map();
+let tabletAudioContext=null,tabletAudioMaster=null,tabletAudioGeneration=0;
+const tabletAudioButtons=monitorLayouts.unit.map((channel,index)=>({channel,x:20+index*115,y:69,width:109,height:31}));
+const tabletMuteButton={x:850,y:69,width:152,height:31};
+
+function muteTabletAudio(){
+  tabletAudioGeneration++;
+  for(const [channel,voice] of tabletAudioVoices){
+    tabletAudioVoices.delete(channel);
+    const at=voice.context.currentTime;
+    voice.gain.gain.cancelScheduledValues(at);
+    voice.gain.gain.setTargetAtTime(0,at,.008);
+    voice.oscillator.stop(at+.09);
+    voice.oscillator.onended=()=>{voice.oscillator.disconnect();voice.filter.disconnect();voice.gain.disconnect();};
+  }
+  if(tabletAudioMaster) tabletAudioMaster.gain.setTargetAtTime(0,tabletAudioContext.currentTime,.02);
+}
+
+function tabletAudioSources(elapsed){
+  const room=tabletRoom;
+  return {vital:floorRecords[activeFloor-1]?.[room-1],vent:ventRecordForRoom(room),
+    assignment:roomAssignment(activeHospital,activeFloor,room),elapsed};
+}
+
+async function toggleTabletChannelAudio(channelId){
+  if(tabletAudioVoices.has(channelId)){
+    const voice=tabletAudioVoices.get(channelId);
+    tabletAudioVoices.delete(channelId);
+    const at=voice.context.currentTime;
+    voice.gain.gain.setTargetAtTime(0,at,.008);
+    voice.oscillator.stop(at+.09);
+    voice.oscillator.onended=()=>{voice.oscillator.disconnect();voice.filter.disconnect();voice.gain.disconnect();};
+    return;
+  }
+  const elapsed=exportElapsedSeconds??(performance.now()-playbackStart)/1000;
+  const sources=tabletAudioSources(elapsed);
+  if(monitorChannelState(channelId,sources,elapsed).status)return;
+  const generation=tabletAudioGeneration,room=sources.assignment?.id;
+  if(!tabletAudioContext){
+    tabletAudioContext=new (window.AudioContext||window.webkitAudioContext)();
+    tabletAudioMaster=tabletAudioContext.createGain();tabletAudioMaster.gain.value=0;
+    const limiter=tabletAudioContext.createDynamicsCompressor();limiter.threshold.value=-12;limiter.ratio.value=8;
+    tabletAudioMaster.connect(limiter);limiter.connect(tabletAudioContext.destination);
+  }
+  const context=tabletAudioContext;
+  await context.resume();
+  if(generation!==tabletAudioGeneration||!walkMode||room!==tabletAudioSources(elapsed).assignment?.id||tabletAudioVoices.has(channelId))return;
+  const oscillator=context.createOscillator();oscillator.type='sawtooth';
+  const filter=context.createBiquadFilter();filter.type='lowpass';filter.Q.value=.7;
+  const gain=context.createGain();gain.gain.value=0;
+  oscillator.connect(filter);filter.connect(gain);gain.connect(tabletAudioMaster);
+  oscillator.start();
+  tabletAudioVoices.set(channelId,{context,oscillator,filter,gain});
+}
+
+function syncTabletAudio(elapsed){
+  if(!tabletAudioVoices.size||!tabletAudioContext)return;
+  const sources=tabletAudioSources(elapsed),at=tabletAudioContext.currentTime;
+  tabletAudioMaster.gain.setTargetAtTime(.32/Math.sqrt(tabletAudioVoices.size),at,.02);
+  for(const [channelId,voice] of tabletAudioVoices){
+    const state=monitorChannelState(channelId,sources,elapsed);
+    const value=state.status?null:state.sample(state.count-1);
+    if(!Number.isFinite(value)){
+      voice.gain.gain.setTargetAtTime(0,at,.018);
+      continue;
+    }
+    const [low,high]=state.range,portion=THREE.MathUtils.clamp((value-low)/(high-low||1),0,1);
+    const pressure=channelId==='flow'&&sources.vent?
+      monitorChannelState('pressure',sources,elapsed).sample(249):null;
+    const originalMapping=channelId==='flow'&&Number.isFinite(pressure)?SignalMapping.midi(value,pressure):null;
+    const pitch=48+portion*24;
+    voice.oscillator.frequency.setTargetAtTime(originalMapping?.frequency??440*Math.pow(2,(pitch-69)/12),at,.025);
+    voice.filter.frequency.setTargetAtTime(originalMapping?.cutoff??240*Math.pow(6000/240,portion),at,.025);
+    voice.gain.gain.setTargetAtTime(.07,at,.018);
+  }
+}
+
+function drawTabletAudioControls(c,sources,elapsed){
+  for(const button of tabletAudioButtons){
+    const state=monitorChannelState(button.channel,sources,elapsed),on=tabletAudioVoices.has(button.channel);
+    c.fillStyle=state.status?'#19323a':on?'#23768b':'#244450';
+    c.fillRect(button.x,button.y,button.width,button.height);
+    c.strokeStyle=on?'#8ff1cc':'#5a8997';c.strokeRect(button.x+.5,button.y+.5,button.width-1,button.height-1);
+    c.fillStyle=state.status?'#78959c':'#e6f5f7';c.font='bold 15px system-ui';
+    c.fillText(`${on?'🔊':'🔇'} ${monitorChannels[button.channel].label}`,button.x+6,button.y+21);
+  }
+  c.fillStyle='#244450';c.fillRect(tabletMuteButton.x,tabletMuteButton.y,tabletMuteButton.width,tabletMuteButton.height);
+  c.strokeStyle='#5a8997';c.strokeRect(tabletMuteButton.x+.5,tabletMuteButton.y+.5,tabletMuteButton.width-1,tabletMuteButton.height-1);
+  c.fillStyle='#e6f5f7';c.font='bold 16px system-ui';c.fillText('Mute All',tabletMuteButton.x+31,tabletMuteButton.y+21);
+}
+
+const tabletAudioRaycaster=new THREE.Raycaster();
+function handleTabletAudioClick(event){
+  if(!walkMode||!tabletInspect||!tabletEquipped||!tablet?.display||document.pointerLockElement===renderer.domElement)return false;
+  const bounds=renderer.domElement.getBoundingClientRect();
+  const pointer=new THREE.Vector2((event.clientX-bounds.left)/bounds.width*2-1,-(event.clientY-bounds.top)/bounds.height*2+1);
+  tabletAudioRaycaster.setFromCamera(pointer,camera);
+  const hit=tabletAudioRaycaster.intersectObject(tablet.display)[0];
+  if(!hit?.uv)return false;
+  const x=hit.uv.x*tablet.canvas.width,y=(1-hit.uv.y)*tablet.canvas.height;
+  if(y>=tabletMuteButton.y&&y<=tabletMuteButton.y+tabletMuteButton.height&&x>=tabletMuteButton.x&&x<=tabletMuteButton.x+tabletMuteButton.width){
+    muteTabletAudio();return true;
+  }
+  const button=tabletAudioButtons.find(item=>x>=item.x&&x<=item.x+item.width&&y>=item.y&&y<=item.y+item.height);
+  if(!button)return false;
+  toggleTabletChannelAudio(button.channel).catch(error=>showError(`Tablet sound unavailable: ${error.message}`));
+  return true;
+}
+addEventListener('pagehide',()=>{muteTabletAudio();tabletAudioContext?.close().catch(()=>{});tabletAudioContext=null;});
+
 // Source: scene3d/parts/screens-and-tablet.js
 function makeScreen(room) {
   const surface=makeMonitorSurface('telemetry',512,320);
@@ -561,11 +674,13 @@ function makeTablet() {
   group.add(shell, display);
   camera.add(group);
   group.visible = false;
-  return { group, canvas, texture, drawCount: 0 };
+  return { group, display, canvas, texture, drawCount: 0 };
 }
 
 function selectTabletRoom(room) {
-  tabletRoom = ((room - 1 + 6) % 6) + 1;
+  const next=((room - 1 + 6) % 6) + 1;
+  if(next!==tabletRoom)muteTabletAudio();
+  tabletRoom = next;
   tabletManualRoom = true;
   document.querySelectorAll('[data-room]').forEach(item => item.classList.toggle('active', Number(item.dataset.room) === tabletRoom));
 }
@@ -590,7 +705,7 @@ function drawTablet(elapsed) {
   const room = tabletRoom, vital = floorRecords[activeFloor - 1]?.[room - 1];
   const assignment=roomAssignment(activeHospital,activeFloor,room);
   const vent = ventRecordForRoom(room);
-  const chartX = 196, chartW = 803, rowH = 94;
+  const chartX = 196, chartW = 803, rowH = 87, rowStart=110;
   const stepRate = 100;
   const signature = `${assignment?.id}:${vital?.id || ''}:${Boolean(vital?.parts)}:${Boolean(vent)}`;
   if (tablet.signature !== signature || elapsed < tablet.sweepStart) {
@@ -606,7 +721,7 @@ function drawTablet(elapsed) {
     c.fillText(assignment?.telemetry_record?'VITAL SIGNS · complete MGH recording':assignment?.patient_id?'VITAL SIGNS · NO SOURCE':'VITAL SIGNS · UNASSIGNED', 22, 58);
     c.fillText(assignment?.uc_davis_recording?'VENTILATOR · UC Davis full source visual track':assignment?.patient_id?'VENTILATOR · NO SOURCE':'VENTILATOR · UNASSIGNED', 510, 58);
     for (let row = 0; row < 7; row++) {
-      const y = 75 + row * rowH, channel = monitorChannels[monitorLayouts.unit[row]];
+      const y = rowStart + row * rowH, channel = monitorChannels[monitorLayouts.unit[row]];
       const channelState=monitorChannelState(monitorLayouts.unit[row],{vital,vent,assignment},elapsed);
       const range=channelState.range;
       tablet.ranges.push(range);
@@ -627,16 +742,18 @@ function drawTablet(elapsed) {
       }
     }
     c.fillStyle = '#96bbc2'; c.font = '15px system-ui';
-    c.fillText(`${vital?.id?.toUpperCase() || 'MGH loading'} · patient ${room}/6 · [ / ] cycle · feeds loop independently`, 22, 753);
+    c.fillText(`${vital?.id?.toUpperCase() || 'MGH loading'} · patient ${room}/6 · [ / ] cycle · speakers follow source samples`, 22, 753);
     texture.needsUpdate = true;
   }
+  drawTabletAudioControls(c,{vital,vent,assignment},elapsed);
+  texture.needsUpdate=true;
   if (assignment?.telemetry_record && (!vital || !isCached(vital, elapsed))) return;
   const currentStep = Math.floor((elapsed - tablet.sweepStart) * stepRate);
   if (currentStep - tablet.lastStep > chartW) tablet.lastStep = currentStep - chartW;
   for (let step = tablet.lastStep + 1; step <= currentStep; step++) {
     const x = step % chartW, t = tablet.sweepStart + step / stepRate;
     for (let row = 0; row < 7; row++) {
-      const y = 75 + row * rowH, channel = monitorChannels[monitorLayouts.unit[row]];
+      const y = rowStart + row * rowH, channel = monitorChannels[monitorLayouts.unit[row]];
       const key = channel.key;
       const available = row < 4 ? Boolean(vital?.parts && vital.channels[key]) : Boolean(vent && Array.isArray(vent[key]));
       if (!available) continue;
@@ -1911,6 +2028,7 @@ function updateOpenFeedButton() {
 }
 
 function activateHospital(hospitalId) {
+  muteTabletAudio();
   setGrandCubeFocused(false);
   setCubeHover(null);
   hideHospitalCubes();
@@ -1947,6 +2065,7 @@ async function selectHospital(hospitalId) {
 
 async function setFloor(number, moveCamera = true) {
   if(!meta?.floors[number-1])return;
+  if(number!==activeFloor)muteTabletAudio();
   const token=++floorSelectToken;
   const hospitalId=activeHospital;
   requestedFloor=number;
@@ -2008,6 +2127,7 @@ function toggleElevatorDoor() {
 }
 
 function setRoom(room) {
+  if(room!==activeRoom)muteTabletAudio();
   leaveHospitalView();
   setGrandCubeFocused(false);
   activeRoom = room;
@@ -2190,6 +2310,7 @@ function stopTour(restoreDoors = true) {
 
 function stopWalk() {
   if (!walkMode) return;
+  muteTabletAudio();
   walkMode = false;
   walkRoom=0;
   tabletInspect = false;
@@ -2374,7 +2495,7 @@ document.querySelector('#cubeAuto').addEventListener('click', () => {
   if(!grandCube)return;
   setCubeAutoRotation(!grandCube.auto.enabled);
 });
-renderer.domElement.addEventListener('click', event => { if (walkMode && !pickCubeFace(event) && document.pointerLockElement !== renderer.domElement) renderer.domElement.requestPointerLock(); });
+renderer.domElement.addEventListener('click', event => { if (walkMode && !handleTabletAudioClick(event) && !pickCubeFace(event) && document.pointerLockElement !== renderer.domElement) renderer.domElement.requestPointerLock(); });
 document.addEventListener('mousemove', event => {
   if (!walkMode || document.pointerLockElement !== renderer.domElement) return;
   camera.rotation.y -= event.movementX * 0.002;
@@ -2572,8 +2693,10 @@ function animate() {
         if (distance < nearest) { nearest = distance; room = i + 1; }
       });
       const nextWalkRoom=nearest<7?room:0;
+      if(nextWalkRoom!==walkRoom)muteTabletAudio();
       if(nextWalkRoom!==walkRoom){walkRoom=nextWalkRoom;updateOpenFeedButton();updateToolbarSelection();}
       if (!tabletManualRoom && nearest < 7 && tabletRoom !== room) {
+        muteTabletAudio();
         tabletRoom = room;
         document.querySelectorAll('[data-room]').forEach(item => item.classList.toggle('active', Number(item.dataset.room) === tabletRoom));
       }
@@ -2594,6 +2717,7 @@ function animate() {
     drawTelemetryFrame(now, seconds, frustum);
     drawVentilatorsFrame(seconds, frustum);
     drawTablet(seconds);
+    syncTabletAudio(seconds);
     drawCubeFaces(seconds, now, frustum);
     lastFeedPaint = now;
   }
@@ -2902,6 +3026,7 @@ window.addEventListener('message',event=>{
     reportSceneStatus(window.wardViewer?'ready':'loading');
     if(window.wardViewer)reportSceneLocation(hospitalView?'campus':expandedHospital?'expanded':'floor');
   }
+  else if(action==='mute-tablet-audio')muteTabletAudio();
   else if(action==='reset')showHospitalView();
   else if(action==='zoom-in' || action==='zoom-out'){
     cameraMove=null;
