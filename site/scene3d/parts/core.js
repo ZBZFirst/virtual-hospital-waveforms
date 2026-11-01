@@ -19,6 +19,9 @@ const reportSceneStatus = (status, message='') => {
 const reportSceneLocation = view => {
   if(embedded)parent.postMessage({type:'zebezo-scene-location',view,hospital:activeHospital,floor:activeFloor},location.origin);
 };
+const reportSceneModal = open => {
+  if(embedded)parent.postMessage({type:'zebezo-scene-modal',open},location.origin);
+};
 function updateToolbarSelection(){
   document.querySelector('#hospitalPickerLabel').textContent=`Hospital ${activeHospital}`;
   document.querySelector('#floorPickerLabel').textContent=hospitalView||expandedHospital?'Floor':`Floor ${activeFloor}`;
@@ -31,7 +34,7 @@ scene.fog = new THREE.Fog(0x17262d, 75, 900);
 const camera = new THREE.PerspectiveCamera(53, 1, 0.03, 720);
 scene.add(camera);
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-const basePixelRatio = Math.min(devicePixelRatio, 1.5);
+const basePixelRatio = Math.min(devicePixelRatio, matchMedia('(max-width:650px)').matches ? 1 : 1.5);
 renderer.setPixelRatio(basePixelRatio);
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;

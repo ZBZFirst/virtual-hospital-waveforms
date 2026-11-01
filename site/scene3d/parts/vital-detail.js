@@ -19,6 +19,7 @@ function openVitalDetail(assignment, source='vital') {
   document.querySelector('#vitalLivePlay').textContent='Pause';
   document.querySelector('#vitalProgress').textContent='Loading full source waveform…';
   panel.classList.add('open');
+  reportSceneModal(true);
   document.querySelector('#closeTelemetry').focus();
   selectVitalDetailTab(source);
   if(source==='vital' && assignment.telemetry_record)selectVitalMode('live');
@@ -30,6 +31,7 @@ function selectVitalDetailTab(source) {
   const assignment=telemetryDetail.assignment;
   if(source==='vent' && assignment.uc_davis_recording){
     document.querySelector('#telemetryDetail').classList.remove('open');
+    reportSceneModal(false);
     telemetryDetail=null;
     parent.postMessage({type:'zebezo-open-recording',recording:assignment.uc_davis_recording,roomId:assignment.id},location.origin);
     return;

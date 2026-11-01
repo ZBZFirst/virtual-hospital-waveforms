@@ -133,6 +133,7 @@ document.querySelector('#vitalWindow').addEventListener('change',()=>{lastDetail
 document.querySelector('#closeTelemetry').addEventListener('click',()=>{
   telemetryDetail=null;
   document.querySelector('#telemetryDetail').classList.remove('open');
+  reportSceneModal(false);
 });
 document.querySelector('#cubeAuto').addEventListener('click', () => {
   if(!grandCube)return;
@@ -145,6 +146,36 @@ renderer.domElement.addEventListener('click', event => {
   if(event.pointerType==='touch')return;
   if(document.pointerLockElement!==renderer.domElement)renderer.domElement.requestPointerLock();
 });
+let touchLook=null;
+renderer.domElement.addEventListener('pointerdown',event=>{
+  if(event.pointerType!=='touch'||!walkMode||tabletDisplayHit(event))return;
+  touchLook={id:event.pointerId,x:event.clientX,y:event.clientY};
+  renderer.domElement.setPointerCapture(event.pointerId);
+});
+renderer.domElement.addEventListener('pointermove',event=>{
+  if(!touchLook||touchLook.id!==event.pointerId||!walkMode)return;
+  const dx=event.clientX-touchLook.x,dy=event.clientY-touchLook.y;
+  touchLook.x=event.clientX;touchLook.y=event.clientY;
+  camera.rotation.y-=dx*0.004;
+  camera.rotation.x=THREE.MathUtils.clamp(camera.rotation.x-dy*0.004,-1.48,1.48);
+  camera.rotation.z=0;
+  event.preventDefault();
+});
+for(const type of ['pointerup','pointercancel'])renderer.domElement.addEventListener(type,event=>{
+  if(touchLook?.id===event.pointerId)touchLook=null;
+});
+for(const button of document.querySelectorAll('[data-walk-key]')){
+  const key=button.dataset.walkKey;
+  button.addEventListener('pointerdown',event=>{
+    if(!walkMode)return;
+    button.setPointerCapture(event.pointerId);
+    movementKeys.add(key);
+    event.preventDefault();
+  });
+  for(const type of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(type,()=>movementKeys.delete(key));
+}
+document.querySelector('[data-touch-action="tablet"]').addEventListener('click',()=>document.querySelector('#inspectTarget').click());
+document.querySelector('[data-touch-action="elevator"]').addEventListener('click',()=>toggleElevatorDoor());
 document.addEventListener('mousemove', event => {
   if (!walkMode || document.pointerLockElement !== renderer.domElement) return;
   camera.rotation.y -= event.movementX * 0.002;

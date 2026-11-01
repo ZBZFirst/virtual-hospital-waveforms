@@ -574,3 +574,48 @@ body.room-hahnicity #room-breath-list button.selected{background:#725438;border-
  .room-feed-toolbar .room-live-controls,.room-feed-toolbar .transport{flex:1 1 100%}
  .room-feed-toolbar #room-live-progress{width:100%;min-width:0;margin-left:0;text-align:left;white-space:normal}
 }
+
+.mobile-site-title{display:none}
+@media(max-width:700px){
+ body.scene-modal-open .site-head,body.scene-modal-open .atlas-footer{display:none}
+ .site-head{padding:calc(8px + env(safe-area-inset-top)) 10px 8px;align-items:center;min-height:58px}
+ .site-head .eyebrow,.desktop-site-title{display:none}
+ .mobile-site-title{display:inline}
+ .site-head h1{font-size:19px;white-space:nowrap}
+ .mobile-menu-toggle{min-height:42px}
+ .atlas-footer{padding:5px 9px max(5px,env(safe-area-inset-bottom))}
+ .atlas-footer .session-clock,.atlas-footer .mobile-hint{display:none}
+ .atlas-footer #activityStatus{grid-column:1/-1;font-size:10px}
+ .detail-panel.popup{overscroll-behavior:contain;padding:10px}
+ .detail-heading{top:-10px;padding:8px 0 7px}
+ .detail-heading h2.room-title{font-size:20px;white-space:normal}
+ .stream-meta.patient-id{max-height:none;overflow:visible}
+ .patient-waveform-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+ .patient-waveform-tabs button{min-width:0;min-height:44px;padding:7px 4px;font-size:12px}
+ .detail-actions{gap:5px}
+ .detail-actions button{min-height:44px}
+ .room-feed-toolbar .room-feed-switch{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .room-feed-toolbar .room-feed-switch button{min-height:44px;padding:7px 4px}
+ .room-live-controls button,.room-live-controls select,.room-feed-toolbar .transport button,.room-feed-toolbar .transport select{min-height:44px}
+ .room-live-controls label,.room-feed-toolbar .transport label{flex:1 1 120px;min-width:0}
+ .room-live-controls label,.room-feed-toolbar .transport label{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:4px}
+ .room-live-controls select,.room-feed-toolbar .transport select{width:100%;min-width:0;max-width:100%}
+ .room-waveform-heading{gap:7px;padding:10px}
+ .room-waveform-heading>div:first-child{flex-basis:100%}
+ .room-perspective{order:2}
+ .room-breath-label{order:3;white-space:normal}
+ .room-source-badge{order:4}
+ .room-waveform-heading>button{min-height:40px}
+ .chart-axis-controls button{min-width:36px;min-height:36px}
+ #room-chart-stage>.signal-card canvas{height:150px}
+ .room-live-stats>div{padding:9px}
+ .room-live-stats strong{font-size:16px}
+ .room-bin-scroll{overscroll-behavior-x:contain}
+}
+@media(max-width:360px){
+ .site-head h1{font-size:17px}
+ .detail-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+ .detail-actions #loadStatus,.detail-actions #midiReadout{grid-column:1/-1}
+ .detail-actions button{min-width:0;padding:6px 3px;font-size:11px}
+ .room-waveform-heading>button{flex:1 1 auto}
+}

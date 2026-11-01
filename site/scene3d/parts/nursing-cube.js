@@ -270,7 +270,12 @@ renderer.domElement.addEventListener('pointerdown',event=>{
   const face=pickCubeFace(event);
   if(!face)return;
   event.preventDefault();event.stopImmediatePropagation();
-  grandCube.drag={pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,x:event.clientX,y:event.clientY,moved:false,face};
+  const drag={pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,x:event.clientX,y:event.clientY,moved:false,face,longPressed:false,timer:null};
+  grandCube.drag=drag;
+  if(event.pointerType==='touch'&&grandCube.focused)drag.timer=setTimeout(()=>{
+    if(grandCube?.drag!==drag||drag.moved)return;
+    drag.longPressed=toggleCubeRoomEnlargement({clientX:drag.startX,clientY:drag.startY});
+  },550);
   renderer.domElement.setPointerCapture(event.pointerId);
   controls.enabled=false;
   renderer.domElement.style.cursor='grabbing';
@@ -284,6 +289,7 @@ renderer.domElement.addEventListener('pointermove',event=>{
     const dx=event.clientX-drag.x,dy=event.clientY-drag.y;
     if(Math.hypot(event.clientX-drag.startX,event.clientY-drag.startY)>8)drag.moved=true;
     if(drag.moved){
+      clearTimeout(drag.timer);
       grandCube.rotor.rotation.y+=dx*0.007;
       grandCube.rotor.rotation.x+=dy*0.007;
     }
@@ -300,6 +306,7 @@ renderer.domElement.addEventListener('pointerup',event=>{
   if(!drag || drag.pointerId!==event.pointerId)return;
   event.preventDefault();event.stopImmediatePropagation();
   if(Math.hypot(event.clientX-drag.startX,event.clientY-drag.startY)>8)drag.moved=true;
+  clearTimeout(drag.timer);
   grandCube.drag=null;
   grandCube.auto.pauseUntil=performance.now()+7000;
   if(drag.moved){grandCube.auto.yawProgress=0;if(!grandCube.focused)startCubePhase('toHorizontal',-0.12,1200);}
@@ -307,13 +314,14 @@ renderer.domElement.addEventListener('pointerup',event=>{
   controls.enabled=!walkMode&&!tourPlaying;
   const releasedFace=pickCubeFace(event);
   setCubeHover(releasedFace,event);
-  if(!drag.moved && releasedFace===drag.face) {
+  if(!drag.moved && !drag.longPressed && releasedFace===drag.face) {
     if(grandCube.focused)selectCubeFloor(drag.face.floor);
     else focusGrandCube();
   }
 },{capture:true});
 renderer.domElement.addEventListener('pointercancel',event=>{
   if(grandCube?.drag?.pointerId!==event.pointerId)return;
+  clearTimeout(grandCube.drag.timer);
   grandCube.drag=null;
   grandCube.auto.pauseUntil=performance.now()+7000;
   grandCube.auto.yawProgress=0;

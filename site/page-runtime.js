@@ -1713,6 +1713,7 @@ function setupEvents() {
     if(event.data?.type==='zebezo-scene-status')sceneLoading(event.data.status,event.data.message);
     if(event.data?.type==='zebezo-scene-progress')sceneTransfer(event.data);
     if(event.data?.type==='zebezo-scene-location')syncSceneLocation(event.data);
+    if(event.data?.type==='zebezo-scene-modal')document.body.classList.toggle('scene-modal-open',event.data.open===true);
     if(event.data?.type==='zebezo-cube-face')requestSceneFloor(event.data.hospital,event.data.floor,event.data.quality);
     if(event.data?.type==='zebezo-open-recording'){
       const entry=state.entries.find(item=>item.name===event.data.recording);
@@ -1720,7 +1721,7 @@ function setupEvents() {
       else state.pendingSceneRecording={recording:event.data.recording,roomId:event.data.roomId};
     }
   });
-  els.hospitalScene.addEventListener('load',()=>els.hospitalScene.contentWindow?.postMessage({type:'zebezo-scene-action',action:'status'},location.origin));
+  els.hospitalScene.addEventListener('load',()=>{document.body.classList.remove('scene-modal-open');els.hospitalScene.contentWindow?.postMessage({type:'zebezo-scene-action',action:'status'},location.origin);});
   els.hospitalScene.addEventListener('error',()=>sceneLoading('error','The embedded 3D scene did not load.'));
   els.retryScene.onclick=()=>{
     sceneLoading('loading');

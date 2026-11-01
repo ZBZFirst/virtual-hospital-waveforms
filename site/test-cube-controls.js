@@ -23,6 +23,7 @@ const cube={faces,focused:false,targetScale:.25,hovered:null,drag:null,selectedF
   rotor:{rotation:{x:0,y:0}}};
 const travels=[];
 const composites=[];
+const timers=new Map();let nextTimer=0;
 let gridSlots=0,expandedLayouts=0;
 const faceContext={fillRect(){},strokeRect(){},fillText(){},save(){},restore(){},
   set globalCompositeOperation(value){composites.push(value);}};
@@ -32,7 +33,10 @@ const context={grandCube:cube,activeFloor:1,activeHospital:'A',walkMode:false,to
   document:{querySelector:selector=>buttons.get(selector),querySelectorAll:selector=>
     selector==='[data-cube-floor]'?floors:[]},
   performance:{now:()=>1000},updateControlHelp(){},pickCubeFace:event=>event.face||null,
-  pickCubeFaceHit:event=>event.face?{face:event.face,uv:event.uv}:null,
+  pickCubeFaceHit:event=>event.face?{face:event.face,uv:event.uv}:
+    {face:faces[0],uv:{x:112/1280,y:1-175/1280}},
+  setTimeout:callback=>{const id=++nextTimer;timers.set(id,callback);return id;},
+  clearTimeout:id=>timers.delete(id),
   startCubePhase(){},overview(){},setFloor:async(floor,moveCamera)=>{travels.push([floor,moveCamera]);},
   floorRecords:[],ventRecordForRoom:()=>null,roomAssignment:()=>({patient_id:'P1'}),
   drawGrandSlot(){gridSlots++;},drawMonitorLayout(){expandedLayouts++;},
@@ -69,6 +73,17 @@ canvas.handlers.get('contextmenu')({face:faces[0],uv:{x:.5,y:.99},clientX:10,cli
 assert.equal(faces[0].enlargedRoom,null,'right-click again restores the six-room view');
 context.drawCubeFace(faces[0],0,1000);
 assert.equal(gridSlots,gridBefore+42);
+const touchEvent={button:0,pointerType:'touch',pointerId:9,clientX:10,clientY:10,face:faces[0],
+  preventDefault(){},stopImmediatePropagation(){}};
+canvas.handlers.get('pointerdown')(touchEvent);
+timers.get(cube.drag.timer)();
+assert.equal(faces[0].enlargedRoom,1,'press and hold enlarges a patient on touch screens');
+canvas.handlers.get('pointerup')(touchEvent);
+assert.equal(cube.selectedFloor,null,'press and hold does not also select a floor');
+canvas.handlers.get('pointerdown')(touchEvent);
+timers.get(cube.drag.timer)();
+canvas.handlers.get('pointerup')(touchEvent);
+assert.equal(faces[0].enlargedRoom,null,'press and hold again restores the six-room face');
 const pointer=(type,face,x,y)=>canvas.handlers.get(type)({button:0,pointerId:1,clientX:x,clientY:y,face,
   preventDefault(){},stopImmediatePropagation(){}});
 pointer('pointerdown',faces[1],10,10);

@@ -149,6 +149,7 @@ function stopWalk() {
   if (!walkMode) return;
   muteTabletAudio();
   walkMode = false;
+  document.querySelector('#walkTouchControls').hidden=true;
   walkRoom=0;
   tabletInspect = false;
   placeTablet();
@@ -173,6 +174,7 @@ async function startWalk() {
   leaveHospitalView();
   setGrandCubeFocused(false);
   walkMode = true;
+  document.querySelector('#walkTouchControls').hidden=false;
   walkRoom=0;
   tabletManualRoom = false;
   cameraMove = null;

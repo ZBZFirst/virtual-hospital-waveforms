@@ -113,6 +113,36 @@
       #barHeader { min-height: 38px; }
       html.embedded body.controls-collapsed #status { max-width: calc(100% - 94px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     }
+    #walkTouchControls[hidden] { display: none; }
+    #walkTouchControls { display: none; }
+    @media(max-width:700px) {
+      html.embedded #bar { top: calc(62px + env(safe-area-inset-top)); left: 6px; right: 6px; width: calc(100vw - 12px); max-height: min(38dvh,240px); overflow: auto; }
+      html.embedded body.controls-collapsed #bar { max-height: 55px; overflow: hidden; }
+      html.embedded #toggleControls { display: inline-block; }
+      #barHeader { min-height: 34px; }
+      .toolbar-row button,.toolbar-picker summary { min-height: 42px; }
+      #help { left: auto; right: 7px; bottom: calc(46px + env(safe-area-inset-bottom)); max-width: 110px; }
+      #helpSummary { display: none; }
+      #help button { min-height: 42px; }
+      html.embedded #controlsLegend { left: 7px; right: 7px; bottom: calc(96px + env(safe-area-inset-bottom)); width: auto; max-height: min(58dvh,450px); }
+      #cubeInspector,html.embedded.streamer-layout #cubeInspector { top: calc(122px + env(safe-area-inset-top)); right: 7px; max-height: calc(100dvh - 175px); }
+      html.embedded #telemetryDetail,#telemetryDetail { inset: 0; padding: max(8px,env(safe-area-inset-top)) 8px max(8px,env(safe-area-inset-bottom)); border-radius: 0; gap: 7px; overscroll-behavior: contain; }
+      #telemetryDetail header { position: sticky; top: -8px; z-index: 2; padding: 6px 0; background: #10242a; }
+      #telemetryDetail header button { min-height: 42px; }
+      #telemetryDetail .vital-charts { overflow: visible; flex: none; }
+      #telemetryDetail .vital-chart { padding: 5px; }
+      #telemetryDetail canvas { height: 145px; }
+      #vitalOverview { height: 140px!important; }
+      #telemetryDetail .vital-controls output { margin-left: 0; flex-basis: 100%; }
+      #telemetryDetail .vital-controls button,#telemetryDetail .vital-mode button,#telemetryDetail .vital-review-controls button { min-height: 42px; }
+    }
+    @media(max-width:700px) and (pointer:coarse) {
+      #view canvas { touch-action: none; }
+      #walkTouchControls:not([hidden]) { position: fixed; z-index: 4; left: 7px; bottom: calc(68px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(3,50px); gap: 4px; padding: 5px; border: 1px solid #5a8997; border-radius: 9px; background: #102b39d9; touch-action: none; }
+      #walkTouchControls button { min-width: 0; min-height: 45px; padding: 4px 2px; font-size: 12px; touch-action: none; user-select: none; }
+      #walkTouchControls button[data-walk-key] { font-size: 22px; }
+      #walkTouchControls button:active { background: #23768b; }
+    }
   </style>
   <script type="importmap">
   {"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/jsm/"}}
@@ -120,6 +150,7 @@
 </head>
 <body>
   <div id="view"></div>
+  <div id="walkTouchControls" aria-label="Walk controls" hidden><button type="button" data-touch-action="tablet" aria-label="Inspect or lower tablet">Tablet</button><button type="button" data-walk-key="w" aria-label="Move forward">↑</button><button type="button" data-touch-action="elevator" aria-label="Open or close elevator">Elevator</button><button type="button" data-walk-key="a" aria-label="Move left">←</button><button type="button" data-walk-key="s" aria-label="Move backward">↓</button><button type="button" data-walk-key="d" aria-label="Move right">→</button></div>
   <div id="modelLoading" role="status" aria-live="polite" hidden><div class="model-loading-card"><strong id="modelLoadingTitle">Loading floor…</strong><progress id="modelLoadingBar" max="100" value="0" aria-label="3D scene build progress"></progress><output id="modelLoadingAmount" aria-live="off">0%</output><small id="modelLoadingPhase">Downloading 3D models</small></div></div>
   <div id="bar">
     <div id="barHeader" title="Drag to move campus controls"><strong>ZeBeZo hospital campus</strong><span class="drag-cue">↕ Drag</span><button id="toggleControls" aria-expanded="false" aria-controls="bar">Controls ▾</button></div>
@@ -145,8 +176,8 @@
   <aside id="controlsLegend" aria-label="Environment controls guide" hidden>
     <h2>Environment controls · <span id="controlMode">Scene</span></h2>
     <section data-control-mode="scene"><h3>Scene and location</h3><p>Drag to orbit. Right drag to pan. Wheel to zoom. On touch screens, drag with one finger to orbit; use two fingers to pan or zoom.</p><p>Use Location to choose a hospital, floor, and room. Click a building or floor in the scene to enter it. Views switches between hospital, floor, and walk views. The toolbar header can be dragged to move it.</p></section>
-    <section data-control-mode="cube"><h3>Nursing cube</h3><p>Use Patient → Inspect nursing cube to focus it. Drag the cube or use the arrow buttons to rotate. Drag the control panel by its header to move it. Click or tap a face, or use the numbered floor buttons, to select a floor. Right-click a patient room on a cube face to enlarge its waveforms across that face; right-click again to restore all six rooms. Selection never travels.</p><p>The current floor face is color inverted. Another floor keeps its normal colors until selected, when it receives a teal highlight. Use Visit Floor to travel. Resume rotation clears the selection. Close inspection returns to the floor view.</p></section>
-    <section data-control-mode="walk"><h3>Walk mode</h3><p>Choose Views → Walk mode, then click the scene for mouse look. W/A/S/D moves, Shift moves faster, E opens the elevator, and [ / ] changes the tablet patient. Keys 1–7 toggle the tablet speakers from left to right; 0 mutes all. Press I to inspect or lower the tablet. You can also click or tap its sound buttons after opening it. Click the scene outside the tablet to resume mouse look; Esc releases the mouse.</p><p>On touch screens, use the toolbar to choose rooms and views.</p></section>
+    <section data-control-mode="cube"><h3>Nursing cube</h3><p>Use Patient → Inspect nursing cube to focus it. Drag the cube or use the arrow buttons to rotate. Drag the control panel by its header to move it. Click or tap a face, or use the numbered floor buttons, to select a floor. Right-click or press and hold a patient room on a cube face to enlarge its waveforms; repeat to restore all six rooms. Selection never travels.</p><p>The current floor face is color inverted. Another floor keeps its normal colors until selected, when it receives a teal highlight. Use Visit Floor to travel. Resume rotation clears the selection. Close inspection returns to the floor view.</p></section>
+    <section data-control-mode="walk"><h3>Walk mode</h3><p>Choose Views → Walk mode, then click the scene for mouse look. W/A/S/D moves, Shift moves faster, E opens the elevator, and [ / ] changes the tablet patient. Keys 1–7 toggle the tablet speakers from left to right; 0 mutes all. Press I to inspect or lower the tablet. You can also click or tap its sound buttons after opening it. Click the scene outside the tablet to resume mouse look; Esc releases the mouse.</p><p>On a phone, hold the arrow buttons to move, drag the scene to look around, and tap Tablet or Elevator for those actions. Use the toolbar to choose rooms and views.</p></section>
     <section data-control-mode="tour"><h3>Unit walk tour</h3><p>Use Motion → Play unit walk to play or pause. Drag its timeline to seek. Views → Floor view returns to the overview. Motion also opens or closes the elevator.</p></section>
     <section data-control-mode="patient"><h3>Patients and waveforms</h3><p>Patient arrows move between rooms or tablet patients. Inspect tablet opens its view in walk mode and frees the cursor. Its header has speaker buttons for each available waveform: 1 ECG II, 2 ART, 3 CVP, 4 PAP, 5 pressure, 6 flow, and 7 calculated volume. Press the same number again to mute that speaker; 0 mutes all. You can also click or tap the buttons. Changing rooms mutes every speaker. Vital Waveforms and Ventilator Waveforms open the available full recordings for the selected patient.</p><p>The full waveform view has Real-Time Feed and Review Feed when that source is available. Use Close to return to the scene.</p></section>
   </aside>
@@ -162,7 +193,7 @@
     <div id="vitalCharts" class="vital-charts"><div class="vital-chart"><canvas id="vitalChart0" aria-label="ECG lead II waveform"></canvas></div><div class="vital-chart"><canvas id="vitalChart1" aria-label="Arterial pressure waveform"></canvas></div><div class="vital-chart"><canvas id="vitalChart2" aria-label="Central venous pressure waveform"></canvas></div><div class="vital-chart"><canvas id="vitalChart3" aria-label="Pulmonary arterial pressure waveform"></canvas></div></div>
     <small>Full PhysioNet MGH/MF source recording. Channels are shown only when present. <a href="https://physionet.org/content/mghdb/1.0.0/" target="_blank" rel="noopener" style="color:#9bdae9">Source and attribution</a></small>
   </section>
-  <script src="../signal-mapping.js?v=20261031-tablet-keys-feed1"></script>
-  <script type="module" src="./viewer.js?v=20261031-tablet-keys-feed1"></script>
+  <script src="../signal-mapping.js?v=20261031-mobile-portrait1"></script>
+  <script type="module" src="./viewer.js?v=20261031-mobile-portrait1"></script>
 </body>
 </html>

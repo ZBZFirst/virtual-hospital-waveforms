@@ -22,6 +22,9 @@ const reportSceneStatus = (status, message='') => {
 const reportSceneLocation = view => {
   if(embedded)parent.postMessage({type:'zebezo-scene-location',view,hospital:activeHospital,floor:activeFloor},location.origin);
 };
+const reportSceneModal = open => {
+  if(embedded)parent.postMessage({type:'zebezo-scene-modal',open},location.origin);
+};
 function updateToolbarSelection(){
   document.querySelector('#hospitalPickerLabel').textContent=`Hospital ${activeHospital}`;
   document.querySelector('#floorPickerLabel').textContent=hospitalView||expandedHospital?'Floor':`Floor ${activeFloor}`;
@@ -34,7 +37,7 @@ scene.fog = new THREE.Fog(0x17262d, 75, 900);
 const camera = new THREE.PerspectiveCamera(53, 1, 0.03, 720);
 scene.add(camera);
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-const basePixelRatio = Math.min(devicePixelRatio, 1.5);
+const basePixelRatio = Math.min(devicePixelRatio, matchMedia('(max-width:650px)').matches ? 1 : 1.5);
 renderer.setPixelRatio(basePixelRatio);
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -1023,7 +1026,12 @@ renderer.domElement.addEventListener('pointerdown',event=>{
   const face=pickCubeFace(event);
   if(!face)return;
   event.preventDefault();event.stopImmediatePropagation();
-  grandCube.drag={pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,x:event.clientX,y:event.clientY,moved:false,face};
+  const drag={pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,x:event.clientX,y:event.clientY,moved:false,face,longPressed:false,timer:null};
+  grandCube.drag=drag;
+  if(event.pointerType==='touch'&&grandCube.focused)drag.timer=setTimeout(()=>{
+    if(grandCube?.drag!==drag||drag.moved)return;
+    drag.longPressed=toggleCubeRoomEnlargement({clientX:drag.startX,clientY:drag.startY});
+  },550);
   renderer.domElement.setPointerCapture(event.pointerId);
   controls.enabled=false;
   renderer.domElement.style.cursor='grabbing';
@@ -1037,6 +1045,7 @@ renderer.domElement.addEventListener('pointermove',event=>{
     const dx=event.clientX-drag.x,dy=event.clientY-drag.y;
     if(Math.hypot(event.clientX-drag.startX,event.clientY-drag.startY)>8)drag.moved=true;
     if(drag.moved){
+      clearTimeout(drag.timer);
       grandCube.rotor.rotation.y+=dx*0.007;
       grandCube.rotor.rotation.x+=dy*0.007;
     }
@@ -1053,6 +1062,7 @@ renderer.domElement.addEventListener('pointerup',event=>{
   if(!drag || drag.pointerId!==event.pointerId)return;
   event.preventDefault();event.stopImmediatePropagation();
   if(Math.hypot(event.clientX-drag.startX,event.clientY-drag.startY)>8)drag.moved=true;
+  clearTimeout(drag.timer);
   grandCube.drag=null;
   grandCube.auto.pauseUntil=performance.now()+7000;
   if(drag.moved){grandCube.auto.yawProgress=0;if(!grandCube.focused)startCubePhase('toHorizontal',-0.12,1200);}
@@ -1060,13 +1070,14 @@ renderer.domElement.addEventListener('pointerup',event=>{
   controls.enabled=!walkMode&&!tourPlaying;
   const releasedFace=pickCubeFace(event);
   setCubeHover(releasedFace,event);
-  if(!drag.moved && releasedFace===drag.face) {
+  if(!drag.moved && !drag.longPressed && releasedFace===drag.face) {
     if(grandCube.focused)selectCubeFloor(drag.face.floor);
     else focusGrandCube();
   }
 },{capture:true});
 renderer.domElement.addEventListener('pointercancel',event=>{
   if(grandCube?.drag?.pointerId!==event.pointerId)return;
+  clearTimeout(grandCube.drag.timer);
   grandCube.drag=null;
   grandCube.auto.pauseUntil=performance.now()+7000;
   grandCube.auto.yawProgress=0;
@@ -1434,6 +1445,7 @@ function openVitalDetail(assignment, source='vital') {
   document.querySelector('#vitalLivePlay').textContent='Pause';
   document.querySelector('#vitalProgress').textContent='Loading full source waveform…';
   panel.classList.add('open');
+  reportSceneModal(true);
   document.querySelector('#closeTelemetry').focus();
   selectVitalDetailTab(source);
   if(source==='vital' && assignment.telemetry_record)selectVitalMode('live');
@@ -1445,6 +1457,7 @@ function selectVitalDetailTab(source) {
   const assignment=telemetryDetail.assignment;
   if(source==='vent' && assignment.uc_davis_recording){
     document.querySelector('#telemetryDetail').classList.remove('open');
+    reportSceneModal(false);
     telemetryDetail=null;
     parent.postMessage({type:'zebezo-open-recording',recording:assignment.uc_davis_recording,roomId:assignment.id},location.origin);
     return;
@@ -2305,6 +2318,7 @@ function stopWalk() {
   if (!walkMode) return;
   muteTabletAudio();
   walkMode = false;
+  document.querySelector('#walkTouchControls').hidden=true;
   walkRoom=0;
   tabletInspect = false;
   placeTablet();
@@ -2329,6 +2343,7 @@ async function startWalk() {
   leaveHospitalView();
   setGrandCubeFocused(false);
   walkMode = true;
+  document.querySelector('#walkTouchControls').hidden=false;
   walkRoom=0;
   tabletManualRoom = false;
   cameraMove = null;
@@ -2487,6 +2502,7 @@ document.querySelector('#vitalWindow').addEventListener('change',()=>{lastDetail
 document.querySelector('#closeTelemetry').addEventListener('click',()=>{
   telemetryDetail=null;
   document.querySelector('#telemetryDetail').classList.remove('open');
+  reportSceneModal(false);
 });
 document.querySelector('#cubeAuto').addEventListener('click', () => {
   if(!grandCube)return;
@@ -2499,6 +2515,36 @@ renderer.domElement.addEventListener('click', event => {
   if(event.pointerType==='touch')return;
   if(document.pointerLockElement!==renderer.domElement)renderer.domElement.requestPointerLock();
 });
+let touchLook=null;
+renderer.domElement.addEventListener('pointerdown',event=>{
+  if(event.pointerType!=='touch'||!walkMode||tabletDisplayHit(event))return;
+  touchLook={id:event.pointerId,x:event.clientX,y:event.clientY};
+  renderer.domElement.setPointerCapture(event.pointerId);
+});
+renderer.domElement.addEventListener('pointermove',event=>{
+  if(!touchLook||touchLook.id!==event.pointerId||!walkMode)return;
+  const dx=event.clientX-touchLook.x,dy=event.clientY-touchLook.y;
+  touchLook.x=event.clientX;touchLook.y=event.clientY;
+  camera.rotation.y-=dx*0.004;
+  camera.rotation.x=THREE.MathUtils.clamp(camera.rotation.x-dy*0.004,-1.48,1.48);
+  camera.rotation.z=0;
+  event.preventDefault();
+});
+for(const type of ['pointerup','pointercancel'])renderer.domElement.addEventListener(type,event=>{
+  if(touchLook?.id===event.pointerId)touchLook=null;
+});
+for(const button of document.querySelectorAll('[data-walk-key]')){
+  const key=button.dataset.walkKey;
+  button.addEventListener('pointerdown',event=>{
+    if(!walkMode)return;
+    button.setPointerCapture(event.pointerId);
+    movementKeys.add(key);
+    event.preventDefault();
+  });
+  for(const type of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(type,()=>movementKeys.delete(key));
+}
+document.querySelector('[data-touch-action="tablet"]').addEventListener('click',()=>document.querySelector('#inspectTarget').click());
+document.querySelector('[data-touch-action="elevator"]').addEventListener('click',()=>toggleElevatorDoor());
 document.addEventListener('mousemove', event => {
   if (!walkMode || document.pointerLockElement !== renderer.domElement) return;
   camera.rotation.y -= event.movementX * 0.002;
